@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nopvc
+spec:
+  clusterIP: None
+  selector:
+    app: nopvc
+  ports:
+  - name: http
+    port: 80
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nopvc
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: nopvc
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nopvc
+  template:
+    metadata:
+      labels:
+        app: nopvc
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+      - name: main
+        image: busybox
+        command:
+        - /bin/sh
+        - -c
+        - 'sleep 99999999'
+        ports:
+        - name: http
+          containerPort: 8080

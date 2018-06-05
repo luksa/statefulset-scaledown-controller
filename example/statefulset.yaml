@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: datastore
+spec:
+  clusterIP: None
+  selector:
+    app: datastore
+  ports:
+  - name: http
+    port: 80
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: datastore
+  annotations:
+    statefulsets.kubernetes.io/drainer-pod-template: |
+      {
+        "metadata": {
+          "labels": {
+            "app": "datastore-drainer"
+          }
+        },
+        "spec": {
+          "terminationGracePeriodSeconds": 5,
+          "containers": [
+            {
+              "name": "main",
+              "image": "busybox",
+              "command": ["/bin/sh", "-c", "echo \"Draining data... this takes 10 seconds!\" ; sleep 10 ; rm /var/data/test.txt; echo \"Data deleted!\""],
+              "volumeMounts": [
+                {
+                  "name": "data",
+                  "mountPath": "/var/data"
+                }
+              ]
+            }
+          ]
+        }
+      }
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: datastore
+  replicas: 3
+  selector:
+    matchLabels:
+      app: datastore
+  template:
+    metadata:
+      labels:
+        app: datastore
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+      - name: main
+        image: busybox
+        command:
+        - /bin/sh
+        - -c
+        - 'echo "data" > /var/data/test.txt ; echo "Data written! Sleeping for a very long time..." ; sleep 99999999'
+        ports:
+        - name: http
+          containerPort: 8080
+        volumeMounts:
+        - name: data
+          mountPath: /var/data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      resources:
+        requests:
+          storage: 1Mi
+      accessModes:
+      - ReadWriteOnce
