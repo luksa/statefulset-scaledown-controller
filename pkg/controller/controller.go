@@ -38,6 +38,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/labels"
+	"sort"
+	"strings"
+	"strconv"
 )
 
 const controllerAgentName = "statefulset-drain-controller"
@@ -268,6 +272,11 @@ func (c *Controller) syncHandler(key string) error {
 		return nil
 	}
 
+	if len(sts.Spec.VolumeClaimTemplates) > 1 {
+		glog.Warningf("Ignoring StatefulSet '%s' because it has more than one VolumeClaimTemplate (controller doesn't support this yet).", sts.Name)
+		return nil
+	}
+
 	if sts.Annotations[AnnotationDrainerPodTemplate] == "" {
 		glog.Infof("Ignoring StatefulSet '%s' because it does not define a drain pod template.", sts.Name)
 		return nil
@@ -275,23 +284,49 @@ func (c *Controller) syncHandler(key string) error {
 
 	//glog.Infof("Replicas: %d", *sts.Spec.Replicas)
 
-	for ordinal := int32(10); ordinal >= 0; ordinal-- { // TODO: need a better way to find orphaned PVCs
+	claims, err := c.getClaims(sts)
+	if err != nil {
+		err = fmt.Errorf("Error while getting list of PVCs in namespace %s: %s", namespace, err)
+		glog.Error(err)
+		return err
+	}
 
-		podName := fmt.Sprintf("%s-%d", sts.Name, ordinal)
+	sort.Slice(claims, func(i, j int) bool {
+		pvc1 := claims[i]
+		pvc2 := claims[j]
+
+		name1, ord1, err1 := extractNameAndOrdinal(pvc1.Name)
+		name2, ord2, err2 := extractNameAndOrdinal(pvc2.Name)
+		if err1 != nil || err2 != nil {
+			panic("not possible, as the PVCs that would fail here were already filtered out in getClaims()")
+		}
+
+		compare := strings.Compare(name1, name2)
+		if compare != 0 {
+			return compare < 0
+		}
+		return ord1 >= ord2	// NOTE: we want reversed order
+	})
+
+
+	for _, pvc := range claims {	// TODO: support multiple volumeClaimTemplates
+		_, ordinal, err := extractNameAndOrdinal(pvc.Name)
+		if err != nil {
+			panic("not possible, as the PVCs that would fail here were already filtered out in getClaims()")
+		}
+
+		podName := getPodName(sts, ordinal)
 		pod, err := c.podLister.Pods(sts.Namespace).Get(podName)
 		if err != nil && !errors.IsNotFound(err) {
 			glog.Errorf("Error while getting Pod %s: %s", podName, err)
 			return err
 		}
 
-		volumeClaimTemplate := sts.Spec.VolumeClaimTemplates[0] // TODO: support multiple volumeClaimTemplates
-		pvcName := getPVCName(sts, volumeClaimTemplate.Name, ordinal)
-
-		// TODO: scale down to zero? should what happens then be configurable? there may or may not be anywhere to drain to
-		if ordinal >= *sts.Spec.Replicas {
-			pvc, err := c.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
+		// TODO: scale down to zero? should what happens on such events be configurable? there may or may not be anywhere to drain to
+		if int32(ordinal) >= *sts.Spec.Replicas {
+			pvc, err := c.pvcLister.PersistentVolumeClaims(namespace).Get(pvc.Name)
 			if err != nil && !errors.IsNotFound(err) {
-				glog.Errorf("Error looking up PVC %s: %s", pvcName, err.Error())
+				glog.Errorf("Error looking up PVC %s: %s", pvc.Name, err.Error())
 				return err
 			}
 
@@ -299,7 +334,7 @@ func (c *Controller) syncHandler(key string) error {
 				continue
 			}
 			if pvc.DeletionTimestamp != nil {
-				glog.Infof("PVC '%s' is being deleted. Ignoring it.", pvcName)
+				glog.Infof("PVC '%s' is being deleted. Ignoring it.", pvc.Name)
 				continue
 			}
 
@@ -308,7 +343,7 @@ func (c *Controller) syncHandler(key string) error {
 
 			// If the Pod doesn't exist, we'll create it
 			if pod == nil { // TODO: what if the PVC doesn't exist here (or what if it's deleted just after we create the pod)
-				glog.Infof("Found orphaned PVC '%s'. Creating drain pod '%s'.", pvcName, podName)
+				glog.Infof("Found orphaned PVC '%s'. Creating drain pod '%s'.", pvc.Name, podName)
 
 				pod, err := newPod(sts, ordinal)
 				if err != nil {
@@ -335,7 +370,7 @@ func (c *Controller) syncHandler(key string) error {
 
 		// Is it a drain pod or a regular stateful pod?
 		if isDrainPod(pod) {
-			err = c.cleanUpDrainPodIfNeeded(sts, pod, pvcName, podName)
+			err = c.cleanUpDrainPodIfNeeded(sts, pod, pvc.Name, podName)
 			if err != nil {
 				return err
 			}
@@ -354,6 +389,31 @@ func (c *Controller) syncHandler(key string) error {
 
 	// TODO: add status annotation (what info?)
 	return nil
+}
+
+func (c *Controller) getClaims(sts *appsv1.StatefulSet) ([]*corev1.PersistentVolumeClaim, error) {
+	// shouldn't use statefulset.Spec.Selector.MatchLabels, as they don't always match; sts controller looks up pvcs by name!
+	allClaims, err := c.pvcLister.PersistentVolumeClaims(sts.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	claims := []*corev1.PersistentVolumeClaim{}
+
+	for _, pvc := range allClaims {
+		name, _, err := extractNameAndOrdinal(pvc.Name)
+		if err != nil {
+			continue
+		}
+
+		for _, t := range sts.Spec.VolumeClaimTemplates {
+			if name == fmt.Sprintf("%s-%s", t.Name, sts.Name) {
+				claims = append(claims, pvc)
+			}
+		}
+	}
+
+	return claims, nil
 }
 
 func (c *Controller) cleanUpDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1.Pod, pvcName, podName string) error {
@@ -464,7 +524,7 @@ func (c *Controller) cachesSynced() bool {
 	return true; // TODO do we even need this?
 }
 
-func newPod(sts *appsv1.StatefulSet, ordinal int32) (*corev1.Pod, error) {
+func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 
 	podTemplateJson := sts.Annotations[AnnotationDrainerPodTemplate]
 	if podTemplateJson == "" {
@@ -505,7 +565,7 @@ func newPod(sts *appsv1.StatefulSet, ordinal int32) (*corev1.Pod, error) {
 			Name: pvcTemplate.Name,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: getPVCName(sts, pvcTemplate.Name, ordinal),
+					ClaimName: getPVCName(sts, pvcTemplate.Name, int32(ordinal)),
 				},
 			},
 		})
@@ -514,10 +574,24 @@ func newPod(sts *appsv1.StatefulSet, ordinal int32) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func getPodName(sts *appsv1.StatefulSet, ordinal int32) string {
+func getPodName(sts *appsv1.StatefulSet, ordinal int) string {
 	return fmt.Sprintf("%s-%d", sts.Name, ordinal)
 }
 
 func getPVCName(sts *appsv1.StatefulSet, volumeClaimName string, ordinal int32) string {
 	return fmt.Sprintf("%s-%s-%d", volumeClaimName, sts.Name, ordinal)
+}
+
+func extractNameAndOrdinal(pvcName string) (string, int, error) {
+	idx := strings.LastIndexAny(pvcName, "-")
+	if idx == -1 {
+		return "", 0, fmt.Errorf("PVC not created by a StatefulSet")
+	}
+
+	name := pvcName[:idx]
+	ordinal, err := strconv.Atoi(pvcName[idx+1:])
+	if err != nil {
+		return "", 0, fmt.Errorf("PVC not created by a StatefulSet")
+	}
+	return name, ordinal, nil
 }
