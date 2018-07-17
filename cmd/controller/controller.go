@@ -31,6 +31,7 @@ import (
 var (
 	masterURL  string
 	kubeconfig string
+	namespace  string
 )
 
 func main() {
@@ -49,7 +50,13 @@ func main() {
 		glog.Fatalf("Error building kubernetes clientset: %s", err.Error())
 	}
 
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
+	var kubeInformerFactory kubeinformers.SharedInformerFactory
+	if namespace != "" {
+		glog.Infof("Configured to only operate on StatefulSets in namespace %s", namespace)
+		kubeInformerFactory = kubeinformers.NewFilteredSharedInformerFactory(kubeClient, time.Second*30, namespace, nil)
+	} else {
+		kubeInformerFactory = kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
+	}
 
 	drainController := controller.NewController(kubeClient, kubeInformerFactory)
 
@@ -63,4 +70,5 @@ func main() {
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&namespace, "namespace", "", "If specified, the controller only handles StatefulSets in the specified namespace.")
 }
