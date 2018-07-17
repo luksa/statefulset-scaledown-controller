@@ -17,10 +17,9 @@ spec:
       serviceAccountName: statefulset-drain-controller
       containers:
       - name: main
-        image: docker.io/luksa/statefulset-drain-controller:0.3
+        image: docker.io/luksa/statefulset-drain-controller:0.4
         args:
-        - --namespace
-        - foo
+        - --localOnly
 ---
 apiVersion: v1
 kind: ServiceAccount
