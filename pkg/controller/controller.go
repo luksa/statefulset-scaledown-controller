@@ -324,20 +324,6 @@ func (c *Controller) syncHandler(key string) error {
 
 		// TODO: scale down to zero? should what happens on such events be configurable? there may or may not be anywhere to drain to
 		if int32(ordinal) >= *sts.Spec.Replicas {
-			pvc, err := c.pvcLister.PersistentVolumeClaims(namespace).Get(pvc.Name)
-			if err != nil && !errors.IsNotFound(err) {
-				glog.Errorf("Error looking up PVC %s: %s", pvc.Name, err.Error())
-				return err
-			}
-
-			if errors.IsNotFound(err) {
-				continue
-			}
-			if pvc.DeletionTimestamp != nil {
-				glog.Infof("PVC '%s' is being deleted. Ignoring it.", pvc.Name)
-				continue
-			}
-
 			// PVC exists, but its ordinal is higher than the current last stateful pod's ordinal;
 			// this means the PVC is an orphan and should be drained & deleted
 
@@ -401,6 +387,11 @@ func (c *Controller) getClaims(sts *appsv1.StatefulSet) ([]*corev1.PersistentVol
 	claims := []*corev1.PersistentVolumeClaim{}
 
 	for _, pvc := range allClaims {
+		if pvc.DeletionTimestamp != nil {
+			glog.Infof("PVC '%s' is being deleted. Ignoring it.", pvc.Name)
+			continue
+		}
+
 		name, _, err := extractNameAndOrdinal(pvc.Name)
 		if err != nil {
 			continue
