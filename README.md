@@ -1,4 +1,4 @@
-# statefulset-drain-controller
+# StatefulSet Drain Controller
 
 This repository implements a controller for draining orphaned PersistentVolumeClaims/PersistentVolumes
 when a StatefulSet is scaled down.
@@ -18,7 +18,7 @@ redistribute it to the other instances or process it in a different way). Once t
 completes, the controller deletes the pod and the PersistentVolumeClaim, releasing the 
 PersistentVolume.
 
-You can read more about the controller in the following [blog post](https://medium.com/@marko.luksa/graceful-scaledown-of-stateful-apps-in-kubernetes-2205fc556ba9).
+You can read more about the controller in [this blog post](https://medium.com/@marko.luksa/graceful-scaledown-of-stateful-apps-in-kubernetes-2205fc556ba9).
 
 ## Running
 The controller can be run as:
@@ -91,6 +91,16 @@ working properly, you should see a new `datastore-2` pod spin up and do its work
 the controller will delete the pod and the PersistentVolumeClaim.
 
 ```bash
+$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-drain-controller/master/example/statefulset.yaml
+
+... wait for all three pod instances to start running before scaling down
+
+$ kubectl get po
+NAME          READY     STATUS        RESTARTS   AGE
+datastore-0   1/1       Running       0          3m
+datastore-1   1/1       Running       0          2m
+datastore-2   1/1       Running       0          5s
+
 $ kubectl scale statefulset datastore --replicas 2
 statefulset.apps/datastore scaled
 
