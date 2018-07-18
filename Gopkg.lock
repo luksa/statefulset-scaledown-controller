@@ -2,30 +2,9 @@
 
 
 [[projects]]
-  name = "github.com/PuerkitoBio/purell"
-  packages = ["."]
-  revision = "0bcb03f4b4d0a9428594752bd2a3b9aa0a9d4bd4"
-  version = "v1.1.0"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/PuerkitoBio/urlesc"
-  packages = ["."]
-  revision = "de5bf2ad457846296e2031421a34e2568e304e35"
-
-[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "782f4967f2dc4564575ca782fe2d04090b5faca8"
-
-[[projects]]
-  name = "github.com/emicklei/go-restful"
-  packages = [
-    ".",
-    "log"
-  ]
-  revision = "3eb9738c1697594ea6e71a7156a9bb32ed216cf0"
-  version = "v2.8.0"
 
 [[projects]]
   name = "github.com/ghodss/yaml"
@@ -33,57 +12,10 @@
   revision = "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 
 [[projects]]
-  name = "github.com/go-openapi/jsonpointer"
-  packages = ["."]
-  revision = "3a0015ad55fa9873f41605d3e8f28cd279c32ab2"
-  version = "0.15.0"
-
-[[projects]]
-  name = "github.com/go-openapi/jsonreference"
-  packages = ["."]
-  revision = "3fb327e6747da3043567ee86abd02bb6376b6be2"
-  version = "0.15.0"
-
-[[projects]]
-  name = "github.com/go-openapi/spec"
-  packages = ["."]
-  revision = "bce47c9386f9ecd6b86f450478a80103c3fe1402"
-  version = "0.15.0"
-
-[[projects]]
-  name = "github.com/go-openapi/swag"
-  packages = ["."]
-  revision = "2b0bd4f193d011c203529df626a65d63cb8a79e8"
-  version = "0.15.0"
-
-[[projects]]
   name = "github.com/gogo/protobuf"
   packages = [
-    "gogoproto",
-    "plugin/compare",
-    "plugin/defaultcheck",
-    "plugin/description",
-    "plugin/embedcheck",
-    "plugin/enumstringer",
-    "plugin/equal",
-    "plugin/face",
-    "plugin/gostring",
-    "plugin/marshalto",
-    "plugin/oneofcheck",
-    "plugin/populate",
-    "plugin/size",
-    "plugin/stringer",
-    "plugin/testgen",
-    "plugin/union",
-    "plugin/unmarshal",
     "proto",
-    "protoc-gen-gogo/descriptor",
-    "protoc-gen-gogo/generator",
-    "protoc-gen-gogo/grpc",
-    "protoc-gen-gogo/plugin",
-    "sortkeys",
-    "vanity",
-    "vanity/command"
+    "sortkeys"
   ]
   revision = "c0656edd0d9eab7c66d1eb0c568f9039345796f7"
 
@@ -141,16 +73,6 @@
   revision = "2ddf6d758266fcb080a4f9e054b9f292c85e6798"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/mailru/easyjson"
-  packages = [
-    "buffer",
-    "jlexer",
-    "jwriter"
-  ]
-  revision = "efc7eb8984d6655c26b5c9d2e65c024e5767c37c"
-
-[[projects]]
   name = "github.com/modern-go/concurrent"
   packages = ["."]
   revision = "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94"
@@ -203,8 +125,7 @@
     "unicode/bidi",
     "unicode/cldr",
     "unicode/norm",
-    "unicode/rangetable",
-    "width"
+    "unicode/rangetable"
   ]
   revision = "b19bf474d317b857955b12035d2c5acb57ce8b01"
 
@@ -212,16 +133,6 @@
   name = "golang.org/x/time"
   packages = ["rate"]
   revision = "f51c12702a4d776e4c1fa9b0fabab841babae631"
-
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/tools"
-  packages = [
-    "go/ast/astutil",
-    "imports",
-    "internal/fastwalk"
-  ]
-  revision = "32950ab3be12acf6d472893021373669979907ab"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -419,7 +330,6 @@
     "plugin/pkg/client/auth/exec",
     "rest",
     "rest/watch",
-    "testing",
     "tools/auth",
     "tools/cache",
     "tools/clientcmd",
@@ -442,60 +352,13 @@
   revision = "f0d11262904f0a1cd1d4b6120add0cf6523ba9d4"
 
 [[projects]]
-  branch = "master"
-  name = "k8s.io/code-generator"
-  packages = [
-    "cmd/client-gen/args",
-    "cmd/client-gen/generators",
-    "cmd/client-gen/generators/fake",
-    "cmd/client-gen/generators/scheme",
-    "cmd/client-gen/generators/util",
-    "cmd/client-gen/path",
-    "cmd/client-gen/types",
-    "cmd/conversion-gen/args",
-    "cmd/conversion-gen/generators",
-    "cmd/deepcopy-gen/args",
-    "cmd/defaulter-gen/args",
-    "cmd/go-to-protobuf/protobuf",
-    "cmd/informer-gen/args",
-    "cmd/informer-gen/generators",
-    "cmd/lister-gen/args",
-    "cmd/lister-gen/generators",
-    "cmd/openapi-gen/args",
-    "pkg/util",
-    "third_party/forked/golang/reflect"
-  ]
-  revision = "7b3961072db196a1068e97f76c74ca6bc6b65350"
-
-[[projects]]
-  branch = "master"
-  name = "k8s.io/gengo"
-  packages = [
-    "args",
-    "examples/deepcopy-gen/generators",
-    "examples/defaulter-gen/generators",
-    "examples/import-boss/generators",
-    "examples/set-gen/generators",
-    "examples/set-gen/sets",
-    "generator",
-    "namer",
-    "parser",
-    "types"
-  ]
-  revision = "906d99f89cd644eecf75ab547b29bf9f876f0b59"
-
-[[projects]]
   name = "k8s.io/kube-openapi"
-  packages = [
-    "pkg/common",
-    "pkg/generators",
-    "pkg/util/proto"
-  ]
+  packages = ["pkg/util/proto"]
   revision = "50ae88d24ede7b8bad68e23c805b5d3da5c8abaf"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "13b64aca0c1833b3022cbf351aeceb7f9d460e20101e740f1f6d2b3ccb6f96b4"
+  inputs-digest = "8489b3551b7f8ec24ff77d07acfdf798978e5b65950d051af460b087b872be12"
   solver-name = "gps-cdcl"
   solver-version = 1

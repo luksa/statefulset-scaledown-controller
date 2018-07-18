@@ -25,30 +25,6 @@
 #   unused-packages = true
 
 
-[[constraint]]
-  name = "github.com/modern-go/concurrent"
-  version = "1.0.3"
-
-[[constraint]]
-  name = "github.com/modern-go/reflect2"
-  version = "1.0.1"
-
-[[constraint]]
-  name = "github.com/spf13/pflag"
-  version = "1.0.1"
-
-[[constraint]]
-  name = "gopkg.in/inf.v0"
-  version = "0.9.0"
-
-[[constraint]]
-  branch = "master"
-  name = "k8s.io/code-generator"
-
-[[constraint]]
-  branch = "master"
-  name = "k8s.io/gengo"
-
 [prune]
   go-tests = true
   unused-packages = true
