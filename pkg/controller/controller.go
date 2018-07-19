@@ -270,14 +270,11 @@ func (c *Controller) syncHandler(key string) error {
 }
 
 func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
+	// TODO: think about scale-down during a rolling upgrade
+
 	if len(sts.Spec.VolumeClaimTemplates) == 0 {
 		// nothing to do, as the stateful pods don't use any PVCs
 		glog.Infof("Ignoring StatefulSet '%s' because it does not use any PersistentVolumeClaims.", sts.Name)
-		return nil
-	}
-
-	if len(sts.Spec.VolumeClaimTemplates) > 1 {
-		glog.Warningf("Ignoring StatefulSet '%s' because it has more than one VolumeClaimTemplate (controller doesn't support this yet).", sts.Name)
 		return nil
 	}
 
@@ -286,38 +283,22 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		return nil
 	}
 
-	//glog.Infof("Replicas: %d", *sts.Spec.Replicas)
-
-	claims, err := c.getClaims(sts)
+	claimsGroupedByOrdinal, err := c.getClaims(sts)
 	if err != nil {
 		err = fmt.Errorf("Error while getting list of PVCs in namespace %s: %s", sts.Namespace, err)
 		glog.Error(err)
 		return err
 	}
 
-	sort.Slice(claims, func(i, j int) bool {
-		pvc1 := claims[i]
-		pvc2 := claims[j]
+	ordinals := make([]int, 0, len(claimsGroupedByOrdinal))
+	for k := range claimsGroupedByOrdinal {
+		ordinals = append(ordinals, k)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(ordinals)))
 
-		name1, ord1, err1 := extractNameAndOrdinal(pvc1.Name)
-		name2, ord2, err2 := extractNameAndOrdinal(pvc2.Name)
-		if err1 != nil || err2 != nil {
-			panic("not possible, as the PVCs that would fail here were already filtered out in getClaims()")
-		}
+	for _, ordinal := range ordinals {
 
-		compare := strings.Compare(name1, name2)
-		if compare != 0 {
-			return compare < 0
-		}
-		return ord1 >= ord2	// NOTE: we want reversed order
-	})
-
-
-	for _, pvc := range claims {	// TODO: support multiple volumeClaimTemplates
-		_, ordinal, err := extractNameAndOrdinal(pvc.Name)
-		if err != nil {
-			panic("not possible, as the PVCs that would fail here were already filtered out in getClaims()")
-		}
+		// TODO check if the number of claims matches the number of StatefulSet's volumeClaimTemplates. What if it doesn't?
 
 		podName := getPodName(sts, ordinal)
 		pod, err := c.podLister.Pods(sts.Namespace).Get(podName)
@@ -333,7 +314,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 
 			// If the Pod doesn't exist, we'll create it
 			if pod == nil { // TODO: what if the PVC doesn't exist here (or what if it's deleted just after we create the pod)
-				glog.Infof("Found orphaned PVC '%s'. Creating drain pod '%s'.", pvc.Name, podName)
+				glog.Infof("Found orphaned PVC(s) for ordinal '%d'. Creating drain pod '%s'.", ordinal, podName)
 
 				pod, err := newPod(sts, ordinal)
 				if err != nil {
@@ -381,14 +362,14 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 	return nil
 }
 
-func (c *Controller) getClaims(sts *appsv1.StatefulSet) ([]*corev1.PersistentVolumeClaim, error) {
+func (c *Controller) getClaims(sts *appsv1.StatefulSet) (claimsGroupedByOrdinal map[int][]*corev1.PersistentVolumeClaim, err error) {
 	// shouldn't use statefulset.Spec.Selector.MatchLabels, as they don't always match; sts controller looks up pvcs by name!
 	allClaims, err := c.pvcLister.PersistentVolumeClaims(sts.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	claims := []*corev1.PersistentVolumeClaim{}
+	claims := map[int][]*corev1.PersistentVolumeClaim{}
 
 	for _, pvc := range allClaims {
 		if pvc.DeletionTimestamp != nil {
@@ -396,14 +377,17 @@ func (c *Controller) getClaims(sts *appsv1.StatefulSet) ([]*corev1.PersistentVol
 			continue
 		}
 
-		name, _, err := extractNameAndOrdinal(pvc.Name)
+		name, ordinal, err := extractNameAndOrdinal(pvc.Name)
 		if err != nil {
 			continue
 		}
 
 		for _, t := range sts.Spec.VolumeClaimTemplates {
 			if name == fmt.Sprintf("%s-%s", t.Name, sts.Name) {
-				claims = append(claims, pvc)
+				if claims[ordinal] == nil {
+					claims[ordinal] = []*corev1.PersistentVolumeClaim{}
+				}
+				claims[ordinal] = append(claims[ordinal], pvc)
 			}
 		}
 	}
