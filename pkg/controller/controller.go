@@ -266,6 +266,10 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
+	return c.processStatefulSet(sts)
+}
+
+func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 	if len(sts.Spec.VolumeClaimTemplates) == 0 {
 		// nothing to do, as the stateful pods don't use any PVCs
 		glog.Infof("Ignoring StatefulSet '%s' because it does not use any PersistentVolumeClaims.", sts.Name)
@@ -286,7 +290,7 @@ func (c *Controller) syncHandler(key string) error {
 
 	claims, err := c.getClaims(sts)
 	if err != nil {
-		err = fmt.Errorf("Error while getting list of PVCs in namespace %s: %s", namespace, err)
+		err = fmt.Errorf("Error while getting list of PVCs in namespace %s: %s", sts.Namespace, err)
 		glog.Error(err)
 		return err
 	}
