@@ -215,14 +215,34 @@ func TestCreatesPodOnScaleDown(t *testing.T) {
 	f.statefulSets = append(f.statefulSets, sts)
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
 
+	expectedPod := newDrainPod(1)
+	f.expectCreatePodAction(expectedPod)
+
+	f.run(getKey(sts, t))
+}
+
+func TestCreatesPodOnScaleDownToZero(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(0)
+	f.statefulSets = append(f.statefulSets, sts)
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(1)...)
+
+	expectedPod := newDrainPod(0)
+	f.expectCreatePodAction(expectedPod)
+
+	f.run(getKey(sts, t))
+}
+
+func newDrainPod(ordinal int) *corev1.Pod {
 	podTemplate := newDrainPodTemplateSpec()
 	expectedPod := &corev1.Pod{
 		ObjectMeta: podTemplate.ObjectMeta,
 		Spec:       podTemplate.Spec,
 	}
-	expectedPod.ObjectMeta.Name = "my-statefulset-1"
+	expectedPod.ObjectMeta.Name = fmt.Sprintf("my-statefulset-%d", ordinal)
 	expectedPod.ObjectMeta.Namespace = metav1.NamespaceDefault
-	expectedPod.ObjectMeta.Labels["drain-pod"] = "my-statefulset-1"
+	expectedPod.ObjectMeta.Labels["drain-pod"] = fmt.Sprintf("my-statefulset-%d", ordinal)
 	expectedPod.ObjectMeta.Annotations = map[string]string{
 		"statefulsets.kubernetes.io/drainer-pod-owner": "my-statefulset",
 	}
@@ -230,15 +250,12 @@ func TestCreatesPodOnScaleDown(t *testing.T) {
 		Name: "data",
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: "data-my-statefulset-1",
+				ClaimName: fmt.Sprintf("data-my-statefulset-%d", ordinal),
 			},
 		},
 	})
 	expectedPod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
-
-	f.expectCreatePodAction(expectedPod)
-
-	f.run(getKey(sts, t))
+	return expectedPod
 }
 
 func newPersistentVolumeClaims(count int) []*corev1.PersistentVolumeClaim {
