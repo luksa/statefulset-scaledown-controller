@@ -208,6 +208,17 @@ func getKey(sts *apps.StatefulSet, t *testing.T) string {
 	return key
 }
 
+func TestIgnoresStatefulSetsWithoutVolumeClaimTemplates(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(3)
+	sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{}
+	f.statefulSets = append(f.statefulSets, sts)
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+
+	f.run(getKey(sts, t))
+}
+
 func TestCreatesPodOnScaleDown(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
