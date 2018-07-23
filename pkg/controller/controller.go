@@ -332,10 +332,13 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 
 				c.recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageDrainPodCreated, podName, sts.Name))
 
-				continue
-				//} else {
-				//	glog.Infof("Pod '%s' exists. Not taking any action.", podName)
+				if sts.Spec.PodManagementPolicy == appsv1.OrderedReadyPodManagement {
+					// don't create additional drain pods; they will be created in one of the
+					// next invocations of this method, when the current drain pod finishes
+					break
+				}
 
+				continue
 			}
 		}
 
@@ -344,12 +347,6 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 			err = c.cleanUpDrainPodIfNeeded(sts, pod, ordinal)
 			if err != nil {
 				return err
-			}
-
-			if sts.Spec.PodManagementPolicy == appsv1.OrderedReadyPodManagement {
-				// don't create additional drain pods; they will be created in one of the
-				// next invocations of this method, when the current drain pod finishes
-				break
 			}
 		} else {
 			// DO nothing. Pod is a regular stateful pod

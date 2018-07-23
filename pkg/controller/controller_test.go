@@ -266,6 +266,35 @@ func TestCreatesPodOnScaleDownToZero(t *testing.T) {
 	f.run(getKey(sts, t))
 }
 
+func TestCreatesOnlyHighestOrdinalPodWhenPodManagementPolicyIsOrderedReady(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	f.statefulSets = append(f.statefulSets, sts)
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(3)...)
+
+	f.expectCreatePodAction(newDrainPod(2))
+
+	f.run(getKey(sts, t))
+}
+
+func TestCreatesMultiplePodsWhenPodManagementPolicyIsParallel(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	sts.Spec.PodManagementPolicy = apps.ParallelPodManagement
+	f.statefulSets = append(f.statefulSets, sts)
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(3)...)
+
+	f.expectCreatePodAction(newDrainPod(2))
+	f.expectCreatePodAction(newDrainPod(1))
+
+	f.run(getKey(sts, t))
+}
+
+// TODO: check if pod is removed after successful completion
+// TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
+
 func newDrainPod(ordinal int) *corev1.Pod {
 	podTemplate := newDrainPodTemplateSpec()
 	expectedPod := &corev1.Pod{
@@ -329,8 +358,9 @@ func newStatefulSet() *apps.StatefulSet {
 			},
 		},
 		Spec: apps.StatefulSetSpec{
-			ServiceName: "my-service",
-			Replicas:    int32Ptr(2),
+			ServiceName:         "my-service",
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Replicas:            int32Ptr(2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "my-app",
