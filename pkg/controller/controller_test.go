@@ -230,6 +230,16 @@ func TestIgnoresStatefulSetsWithoutDrainPodTemplate(t *testing.T) {
 	f.run(getKey(sts, t))
 }
 
+func TestDoesNothingWhenPVCsMatchReplicaCount(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(2)
+	f.statefulSets = append(f.statefulSets, sts)
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+
+	f.run(getKey(sts, t))
+}
+
 func TestCreatesPodOnScaleDown(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
