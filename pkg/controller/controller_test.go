@@ -196,11 +196,26 @@ func filterInformerActions(actions []core.Action) []core.Action {
 }
 
 func (f *fixture) expectCreatePodAction(p *corev1.Pod) {
-	f.expectedActions = append(f.expectedActions, core.NewCreateAction(schema.GroupVersionResource{Resource: "pods"}, p.Namespace, p))
+	f.expectCreateAction("pods", p.Namespace, p)
 }
 
-func (f *fixture) expectUpdateStatefulSetStatusAction(sts *appsv1.StatefulSet) {
-	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "statefulsets"}, sts.Namespace, sts)
+func (f *fixture) expectDeletePodAction(namespace, name string) {
+	f.expectDeleteAction("pods", namespace, name)
+}
+
+func (f *fixture) expectDeletePVCAction(namespace, name string) {
+	f.expectDeleteAction("persistentvolumeclaims", namespace, name)
+}
+
+func (f *fixture) expectCreateAction(resource string, namespace string, obj runtime.Object) {
+	f.expectAction(core.NewCreateAction(schema.GroupVersionResource{Resource: resource}, namespace, obj))
+}
+
+func (f *fixture) expectDeleteAction(resource, namespace, name string) {
+	f.expectAction(core.NewDeleteAction(schema.GroupVersionResource{Resource: resource}, namespace, name))
+}
+
+func (f *fixture) expectAction(action core.Action) {
 	f.expectedActions = append(f.expectedActions, action)
 }
 
@@ -308,7 +323,27 @@ func TestCreatesMultiplePodsWhenPodManagementPolicyIsParallel(t *testing.T) {
 	f.run(sts)
 }
 
-// TODO: check if pod is removed after successful completion
+func TestDeletesPodAndClaimOnSuccessfulCompletion(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	f.statefulSets = append(f.statefulSets, sts)
+	pvcs := newPersistentVolumeClaims(2)
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, pvcs...)
+	for _, pvc := range pvcs {
+		f.kubeObjects = append(f.kubeObjects, pvc)
+	}
+
+	pod := newDrainPod(1)
+	pod.Status.Phase = corev1.PodSucceeded
+	f.pods = append(f.pods, pod)
+	f.kubeObjects = append(f.kubeObjects, pod)
+
+	f.expectDeletePVCAction(metav1.NamespaceDefault, "data-my-statefulset-1")
+	f.expectDeletePodAction(metav1.NamespaceDefault, "my-statefulset-1")
+	f.run(sts)
+}
+
 // TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
 
 func newDrainPod(ordinal int) *corev1.Pod {

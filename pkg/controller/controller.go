@@ -40,8 +40,8 @@ import (
 	"encoding/json"
 	"k8s.io/apimachinery/pkg/labels"
 	"sort"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 const controllerAgentName = "statefulset-drain-controller"
@@ -51,8 +51,8 @@ const AnnotationDrainerPodTemplate = "statefulsets.kubernetes.io/drainer-pod-tem
 const LabelDrainPod = "drain-pod"
 
 const (
-	SuccessCreate = "SuccessfulCreate"
-	DrainSuccess = "DrainSuccess"
+	SuccessCreate    = "SuccessfulCreate"
+	DrainSuccess     = "DrainSuccess"
 	PVCDeleteSuccess = "SuccessfulPVCDelete"
 	PodDeleteSuccess = "SuccessfulDelete"
 
@@ -344,7 +344,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 
 		// Is it a drain pod or a regular stateful pod?
 		if isDrainPod(pod) {
-			err = c.cleanUpDrainPodIfNeeded(sts, pod, ordinal)
+			err = c.deleteDrainPodIfNeeded(sts, pod, ordinal)
 			if err != nil {
 				return err
 			}
@@ -392,13 +392,11 @@ func (c *Controller) getClaims(sts *appsv1.StatefulSet) (claimsGroupedByOrdinal 
 	return claims, nil
 }
 
-func (c *Controller) cleanUpDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
+func (c *Controller) deleteDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
 	// Drain Pod already exists. Check if it's done draining.
 	if pod.Status.Phase == corev1.PodSucceeded {
-		podName := getPodName(sts, ordinal)
-
-		glog.Infof("Drain pod '%s' finished.", podName)
-		c.recorder.Event(sts, corev1.EventTypeNormal, DrainSuccess, fmt.Sprintf(MessageDrainPodFinished, podName, sts.Name))
+		glog.Infof("Drain pod '%s' finished.", pod.Name)
+		c.recorder.Event(sts, corev1.EventTypeNormal, DrainSuccess, fmt.Sprintf(MessageDrainPodFinished, pod.Name, sts.Name))
 
 		for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
 			pvcName := getPVCName(sts, pvcTemplate.Name, int32(ordinal))
@@ -413,12 +411,12 @@ func (c *Controller) cleanUpDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev
 		// TODO what if the user scales up the statefulset and the statefulset controller creates the new pod after we delete the pod but before we delete the PVC
 		// TODO what if we crash after we delete the PVC, but before we delete the pod?
 
-		glog.Infof("Deleting drain pod %s", podName)
-		err := c.kubeclientset.CoreV1().Pods(sts.Namespace).Delete(podName, nil)
+		glog.Infof("Deleting drain pod %s", pod.Name)
+		err := c.kubeclientset.CoreV1().Pods(sts.Namespace).Delete(pod.Name, nil)
 		if err != nil {
 			return err
 		}
-		c.recorder.Event(sts, corev1.EventTypeNormal, PodDeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, podName, sts.Name))
+		c.recorder.Event(sts, corev1.EventTypeNormal, PodDeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, pod.Name, sts.Name))
 	}
 	return nil
 }
@@ -500,7 +498,7 @@ func (c *Controller) handlePod(obj interface{}) {
 }
 
 func (c *Controller) cachesSynced() bool {
-	return true; // TODO do we even need this?
+	return true // TODO do we even need this?
 }
 
 func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
@@ -521,7 +519,7 @@ func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 	if pod.Labels == nil {
 		pod.Labels = map[string]string{}
 	}
-	pod.Labels[LabelDrainPod] = pod.Name;
+	pod.Labels[LabelDrainPod] = pod.Name
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
