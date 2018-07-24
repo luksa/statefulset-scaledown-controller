@@ -49,6 +49,7 @@ type fixture struct {
 	kubeclient *k8sfake.Clientset
 
 	// Objects to put in the store.
+	pods                   []*corev1.Pod
 	statefulSets           []*apps.StatefulSet
 	persistentVolumeClaims []*corev1.PersistentVolumeClaim
 
@@ -74,6 +75,10 @@ func (f *fixture) newController() (*Controller, kubeinformers.SharedInformerFact
 	c := NewController(f.kubeclient, informerFactory)
 
 	c.recorder = &record.FakeRecorder{}
+
+	for _, pod := range f.pods {
+		informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(pod)
+	}
 
 	for _, sts := range f.statefulSets {
 		informerFactory.Apps().V1().StatefulSets().Informer().GetIndexer().Add(sts)
@@ -251,6 +256,17 @@ func TestCreatesPodOnScaleDown(t *testing.T) {
 	f.expectCreatePodAction(expectedPod)
 
 	f.run(getKey(sts, t))
+}
+
+func TestDoesNotCreatePodOnScaleDownWhenPodAlreadyExists(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	f.pods = append(f.pods, newDrainPod(1))
+	f.statefulSets = append(f.statefulSets, sts)
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+
+	f.run(getKey(sts, t))	// no actions expected
 }
 
 func TestCreatesPodOnScaleDownToZero(t *testing.T) {
