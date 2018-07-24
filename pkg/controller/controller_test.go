@@ -21,9 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"encoding/json"
-	"fmt"
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +32,8 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"encoding/json"
+	"fmt"
 )
 
 const annotation = "statefulsets.kubernetes.io/drainer-pod-template"
@@ -50,7 +50,7 @@ type fixture struct {
 
 	// Objects to put in the store.
 	pods                   []*corev1.Pod
-	statefulSets           []*apps.StatefulSet
+	statefulSets           []*appsv1.StatefulSet
 	persistentVolumeClaims []*corev1.PersistentVolumeClaim
 
 	// Actions expected to happen on the client.
@@ -91,11 +91,11 @@ func (f *fixture) newController() (*Controller, kubeinformers.SharedInformerFact
 	return c, informerFactory
 }
 
-func (f *fixture) run(sts *apps.StatefulSet) {
+func (f *fixture) run(sts *appsv1.StatefulSet) {
 	f.runController(getKey(sts, f.t), true, false)
 }
 
-func (f *fixture) runExpectError(sts *apps.StatefulSet) {
+func (f *fixture) runExpectError(sts *appsv1.StatefulSet) {
 	f.runController(getKey(sts, f.t), true, true)
 }
 
@@ -199,12 +199,12 @@ func (f *fixture) expectCreatePodAction(p *corev1.Pod) {
 	f.expectedActions = append(f.expectedActions, core.NewCreateAction(schema.GroupVersionResource{Resource: "pods"}, p.Namespace, p))
 }
 
-func (f *fixture) expectUpdateStatefulSetStatusAction(sts *apps.StatefulSet) {
+func (f *fixture) expectUpdateStatefulSetStatusAction(sts *appsv1.StatefulSet) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "statefulsets"}, sts.Namespace, sts)
 	f.expectedActions = append(f.expectedActions, action)
 }
 
-func getKey(sts *apps.StatefulSet, t *testing.T) string {
+func getKey(sts *appsv1.StatefulSet, t *testing.T) string {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(sts)
 	if err != nil {
 		t.Errorf("Unexpected error getting key for sts %v: %v", sts.Name, err)
@@ -298,7 +298,7 @@ func TestCreatesMultiplePodsWhenPodManagementPolicyIsParallel(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
-	sts.Spec.PodManagementPolicy = apps.ParallelPodManagement
+	sts.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 	f.statefulSets = append(f.statefulSets, sts)
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(3)...)
 
@@ -335,9 +335,10 @@ func newDrainPod(ordinal int) *corev1.Pod {
 	return expectedPod
 }
 
+
 func newPersistentVolumeClaims(count int) []*corev1.PersistentVolumeClaim {
 	claims := make([]*corev1.PersistentVolumeClaim, count)
-	for i := 0; i < count; i++ {
+	for i := 0; i<count; i++ {
 		claims[i] = newPersistentVolumeClaim(fmt.Sprintf("data-my-statefulset-%d", i))
 	}
 	return claims
@@ -358,13 +359,13 @@ func newPersistentVolumeClaim(name string) *corev1.PersistentVolumeClaim {
 	}
 }
 
-func newStatefulSet() *apps.StatefulSet {
+func newStatefulSet() *appsv1.StatefulSet {
 	drainPodTemplateJson, err := json.Marshal(newDrainPodTemplateSpec())
 	if err != nil {
 		panic(err)
 	}
 
-	return &apps.StatefulSet{
+	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-statefulset",
@@ -373,9 +374,9 @@ func newStatefulSet() *apps.StatefulSet {
 				annotation: string(drainPodTemplateJson),
 			},
 		},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsv1.StatefulSetSpec{
 			ServiceName:         "my-service",
-			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 			Replicas:            int32Ptr(2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
