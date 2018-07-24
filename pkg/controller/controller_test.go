@@ -91,12 +91,12 @@ func (f *fixture) newController() (*Controller, kubeinformers.SharedInformerFact
 	return c, informerFactory
 }
 
-func (f *fixture) run(key string) {
-	f.runController(key, true, false)
+func (f *fixture) run(sts *apps.StatefulSet) {
+	f.runController(getKey(sts, f.t), true, false)
 }
 
-func (f *fixture) runExpectError(key string) {
-	f.runController(key, true, true)
+func (f *fixture) runExpectError(sts *apps.StatefulSet) {
+	f.runController(getKey(sts, f.t), true, true)
 }
 
 func (f *fixture) runController(key string, startInformers bool, expectError bool) {
@@ -221,7 +221,7 @@ func TestIgnoresStatefulSetsWithoutVolumeClaimTemplates(t *testing.T) {
 	f.statefulSets = append(f.statefulSets, sts)
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
 
-	f.run(getKey(sts, t))
+	f.run(sts)
 }
 
 func TestIgnoresStatefulSetsWithoutDrainPodTemplate(t *testing.T) {
@@ -232,7 +232,7 @@ func TestIgnoresStatefulSetsWithoutDrainPodTemplate(t *testing.T) {
 	f.statefulSets = append(f.statefulSets, sts)
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
 
-	f.run(getKey(sts, t))
+	f.run(sts)
 }
 
 func TestDoesNothingWhenPVCsMatchReplicaCount(t *testing.T) {
@@ -242,7 +242,7 @@ func TestDoesNothingWhenPVCsMatchReplicaCount(t *testing.T) {
 	f.statefulSets = append(f.statefulSets, sts)
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
 
-	f.run(getKey(sts, t))
+	f.run(sts)
 }
 
 func TestCreatesPodOnScaleDown(t *testing.T) {
@@ -255,7 +255,7 @@ func TestCreatesPodOnScaleDown(t *testing.T) {
 	expectedPod := newDrainPod(1)
 	f.expectCreatePodAction(expectedPod)
 
-	f.run(getKey(sts, t))
+	f.run(sts)
 }
 
 func TestDoesNotCreatePodOnScaleDownWhenPodAlreadyExists(t *testing.T) {
@@ -266,7 +266,7 @@ func TestDoesNotCreatePodOnScaleDownWhenPodAlreadyExists(t *testing.T) {
 	f.statefulSets = append(f.statefulSets, sts)
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
 
-	f.run(getKey(sts, t))	// no actions expected
+	f.run(sts)	// no actions expected
 }
 
 func TestCreatesPodOnScaleDownToZero(t *testing.T) {
@@ -279,7 +279,7 @@ func TestCreatesPodOnScaleDownToZero(t *testing.T) {
 	expectedPod := newDrainPod(0)
 	f.expectCreatePodAction(expectedPod)
 
-	f.run(getKey(sts, t))
+	f.run(sts)
 }
 
 func TestCreatesOnlyHighestOrdinalPodWhenPodManagementPolicyIsOrderedReady(t *testing.T) {
@@ -291,7 +291,7 @@ func TestCreatesOnlyHighestOrdinalPodWhenPodManagementPolicyIsOrderedReady(t *te
 
 	f.expectCreatePodAction(newDrainPod(2))
 
-	f.run(getKey(sts, t))
+	f.run(sts)
 }
 
 func TestCreatesMultiplePodsWhenPodManagementPolicyIsParallel(t *testing.T) {
@@ -305,7 +305,7 @@ func TestCreatesMultiplePodsWhenPodManagementPolicyIsParallel(t *testing.T) {
 	f.expectCreatePodAction(newDrainPod(2))
 	f.expectCreatePodAction(newDrainPod(1))
 
-	f.run(getKey(sts, t))
+	f.run(sts)
 }
 
 // TODO: check if pod is removed after successful completion
