@@ -345,6 +345,7 @@ func TestDeletesPodAndClaimOnSuccessfulCompletion(t *testing.T) {
 }
 
 // TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
+// TODO: StatefulSet deleted while drain pod is running
 
 func newDrainPod(ordinal int) *corev1.Pod {
 	podTemplate := newDrainPodTemplateSpec()
@@ -394,18 +395,13 @@ func newPersistentVolumeClaim(name string) *corev1.PersistentVolumeClaim {
 }
 
 func newStatefulSet() *appsv1.StatefulSet {
-	drainPodTemplateJson, err := json.Marshal(newDrainPodTemplateSpec())
-	if err != nil {
-		panic(err)
-	}
-
 	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-statefulset",
 			Namespace: metav1.NamespaceDefault,
 			Annotations: map[string]string{
-				annotation: string(drainPodTemplateJson),
+				annotation: toJSON(newDrainPodTemplateSpec()),
 			},
 		},
 		Spec: appsv1.StatefulSetSpec{
@@ -471,3 +467,11 @@ func newDrainPodTemplateSpec() *corev1.PodTemplateSpec {
 }
 
 func int32Ptr(i int32) *int32 { return &i }
+
+func toJSON(drainPodTemplateSpec interface{}) string {
+	drainPodTemplateJson, err := json.Marshal(drainPodTemplateSpec)
+	if err != nil {
+		panic(err)
+	}
+	return string(drainPodTemplateJson)
+}
