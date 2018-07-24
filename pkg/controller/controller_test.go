@@ -424,6 +424,12 @@ func newStatefulSet() *appsv1.StatefulSet {
 						{
 							Name:  "main",
 							Image: "busybox",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "data",
+									MountPath: "/var/data",
+								},
+							},
 						},
 					},
 				},
