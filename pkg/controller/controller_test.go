@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"encoding/json"
+	"fmt"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,8 +34,6 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"encoding/json"
-	"fmt"
 )
 
 const annotation = "statefulsets.kubernetes.io/drainer-pod-template"
@@ -266,7 +266,7 @@ func TestDoesNotCreatePodOnScaleDownWhenPodAlreadyExists(t *testing.T) {
 	f.statefulSets = append(f.statefulSets, sts)
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
 
-	f.run(sts)	// no actions expected
+	f.run(sts) // no actions expected
 }
 
 func TestCreatesPodOnScaleDownToZero(t *testing.T) {
@@ -335,10 +335,9 @@ func newDrainPod(ordinal int) *corev1.Pod {
 	return expectedPod
 }
 
-
 func newPersistentVolumeClaims(count int) []*corev1.PersistentVolumeClaim {
 	claims := make([]*corev1.PersistentVolumeClaim, count)
-	for i := 0; i<count; i++ {
+	for i := 0; i < count; i++ {
 		claims[i] = newPersistentVolumeClaim(fmt.Sprintf("data-my-statefulset-%d", i))
 	}
 	return claims
