@@ -67,6 +67,20 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
+func (f *fixture) addStatefulSets(statefulSets ...*appsv1.StatefulSet) {
+	f.statefulSets = append(f.statefulSets, statefulSets...)
+	for _, sts := range statefulSets {
+		f.kubeObjects = append(f.kubeObjects, sts)
+	}
+}
+
+func (f *fixture) addPods(pods ...*corev1.Pod) {
+	f.pods = append(f.pods, pods...)
+	for _, p := range pods {
+		f.kubeObjects = append(f.kubeObjects, p)
+	}
+}
+
 func (f *fixture) addPersistentVolumeClaims(pvcs ...*corev1.PersistentVolumeClaim) {
 	f.persistentVolumeClaims = append(f.persistentVolumeClaims, pvcs...)
 	for _, pvc := range pvcs {
@@ -242,8 +256,8 @@ func TestIgnoresStatefulSetsWithoutVolumeClaimTemplates(t *testing.T) {
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(3)
 	sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{}
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
 	f.run(sts)
 }
@@ -253,8 +267,8 @@ func TestIgnoresStatefulSetsWithoutDrainPodTemplate(t *testing.T) {
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(3)
 	delete(sts.ObjectMeta.Annotations, annotation)
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
 	f.run(sts)
 }
@@ -263,8 +277,8 @@ func TestDoesNothingWhenPVCsMatchReplicaCount(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(2)
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
 	f.run(sts)
 }
@@ -273,8 +287,8 @@ func TestCreatesPodOnScaleDown(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
 	expectedPod := newDrainPod(1)
 	f.expectCreatePodAction(expectedPod)
@@ -286,9 +300,9 @@ func TestDoesNotCreatePodOnScaleDownWhenPodAlreadyExists(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
-	f.pods = append(f.pods, newDrainPod(1))
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(2)...)
+	f.addPods(newDrainPod(1))
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
 	f.run(sts) // no actions expected
 }
@@ -297,8 +311,8 @@ func TestCreatesPodOnScaleDownToZero(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(0)
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(1)...)
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(1)...)
 
 	expectedPod := newDrainPod(0)
 	f.expectCreatePodAction(expectedPod)
@@ -310,8 +324,8 @@ func TestCreatesOnlyHighestOrdinalPodWhenPodManagementPolicyIsOrderedReady(t *te
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(3)...)
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(3)...)
 
 	f.expectCreatePodAction(newDrainPod(2))
 
@@ -323,8 +337,8 @@ func TestCreatesMultiplePodsWhenPodManagementPolicyIsParallel(t *testing.T) {
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
 	sts.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
-	f.statefulSets = append(f.statefulSets, sts)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, newPersistentVolumeClaims(3)...)
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(3)...)
 
 	f.expectCreatePodAction(newDrainPod(2))
 	f.expectCreatePodAction(newDrainPod(1))
@@ -336,17 +350,12 @@ func TestDeletesPodAndClaimOnSuccessfulCompletion(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
-	f.statefulSets = append(f.statefulSets, sts)
-	pvcs := newPersistentVolumeClaims(2)
-	f.persistentVolumeClaims = append(f.persistentVolumeClaims, pvcs...)
-	for _, pvc := range pvcs {
-		f.kubeObjects = append(f.kubeObjects, pvc)
-	}
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
 	pod := newDrainPod(1)
 	pod.Status.Phase = corev1.PodSucceeded
-	f.pods = append(f.pods, pod)
-	f.kubeObjects = append(f.kubeObjects, pod)
+	f.addPods(pod)
 
 	f.expectDeletePVCAction(metav1.NamespaceDefault, "data-my-statefulset-1")
 	f.expectDeletePodAction(metav1.NamespaceDefault, "my-statefulset-1")
@@ -369,7 +378,7 @@ func TestMultipleVolumeClaimTemplates(t *testing.T) {
 			Name:      "other",
 			MountPath: "/var/other",
 		})
-	f.statefulSets = append(f.statefulSets, sts)
+	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 	f.addPersistentVolumeClaims(newCustomPersistentVolumeClaims("other", "my-statefulset", 2)...)
 
@@ -389,8 +398,7 @@ func TestMultipleVolumeClaimTemplates(t *testing.T) {
 
 	pod := expectedPod.DeepCopy()
 	pod.Status.Phase = corev1.PodSucceeded
-	f.pods = append(f.pods, pod)
-	f.kubeObjects = append(f.kubeObjects, pod)
+	f.addPods(pod)
 
 	f.expectDeletePVCAction(metav1.NamespaceDefault, "data-my-statefulset-1")
 	f.expectDeletePVCAction(metav1.NamespaceDefault, "other-my-statefulset-1")
