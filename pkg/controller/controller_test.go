@@ -67,6 +67,13 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
+func (f *fixture) addPersistentVolumeClaims(pvcs ...*corev1.PersistentVolumeClaim) {
+	f.persistentVolumeClaims = append(f.persistentVolumeClaims, pvcs...)
+	for _, pvc := range pvcs {
+		f.kubeObjects = append(f.kubeObjects, pvc)
+	}
+}
+
 func (f *fixture) newController() (*Controller, kubeinformers.SharedInformerFactory) {
 	f.kubeclient = k8sfake.NewSimpleClientset(f.kubeObjects...)
 
@@ -128,6 +135,8 @@ func (f *fixture) runController(key string, startInformers bool, expectError boo
 	if len(f.expectedActions) > len(k8sActions) {
 		f.t.Errorf("%d additional expected actions:%+v", len(f.expectedActions)-len(k8sActions), f.expectedActions[len(k8sActions):])
 	}
+
+	f.expectedActions = f.expectedActions[:0] // clear expectedActions
 }
 
 // checkAction verifies that expected and actual actions are equal and both have
@@ -344,6 +353,53 @@ func TestDeletesPodAndClaimOnSuccessfulCompletion(t *testing.T) {
 	f.run(sts)
 }
 
+func TestMultipleVolumeClaimTemplates(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	sts.Spec.VolumeClaimTemplates = append(sts.Spec.VolumeClaimTemplates,
+		corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "other",
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{},
+		})
+	sts.Spec.Template.Spec.Containers[0].VolumeMounts = append(sts.Spec.Template.Spec.Containers[0].VolumeMounts,
+		corev1.VolumeMount{
+			Name:      "other",
+			MountPath: "/var/other",
+		})
+	f.statefulSets = append(f.statefulSets, sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
+	f.addPersistentVolumeClaims(newCustomPersistentVolumeClaims("other", "my-statefulset", 2)...)
+
+	expectedPod := newDrainPod(1)
+	expectedPod.Spec.Volumes = append(expectedPod.Spec.Volumes,
+		corev1.Volume{
+			Name: "other",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fmt.Sprintf("other-my-statefulset-%d", 1),
+				},
+			},
+		})
+	f.expectCreatePodAction(expectedPod)
+
+	f.run(sts)
+
+	pod := expectedPod.DeepCopy()
+	pod.Status.Phase = corev1.PodSucceeded
+	f.pods = append(f.pods, pod)
+	f.kubeObjects = append(f.kubeObjects, pod)
+
+	f.expectDeletePVCAction(metav1.NamespaceDefault, "data-my-statefulset-1")
+	f.expectDeletePVCAction(metav1.NamespaceDefault, "other-my-statefulset-1")
+	f.expectDeletePodAction(metav1.NamespaceDefault, "my-statefulset-1")
+
+	f.run(sts)
+}
+
+// TODO: two volumeClaimTemplates, but one PVC is missing
 // TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
 // TODO: StatefulSet deleted while drain pod is running
 
@@ -372,17 +428,21 @@ func newDrainPod(ordinal int) *corev1.Pod {
 }
 
 func newPersistentVolumeClaims(count int) []*corev1.PersistentVolumeClaim {
+	return newCustomPersistentVolumeClaims("data", "my-statefulset", count)
+}
+
+func newCustomPersistentVolumeClaims(templateName, statefulSetName string, count int) []*corev1.PersistentVolumeClaim {
 	claims := make([]*corev1.PersistentVolumeClaim, count)
 	for i := 0; i < count; i++ {
-		claims[i] = newPersistentVolumeClaim(fmt.Sprintf("data-my-statefulset-%d", i))
+		claims[i] = newPersistentVolumeClaim(templateName, statefulSetName, i)
 	}
 	return claims
 }
 
-func newPersistentVolumeClaim(name string) *corev1.PersistentVolumeClaim {
+func newPersistentVolumeClaim(templateName, statefulSetName string, ordinal int) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      fmt.Sprintf("%s-%s-%d", templateName, statefulSetName, ordinal),
 			Namespace: metav1.NamespaceDefault,
 			Labels: map[string]string{
 				"app": "my-app",
