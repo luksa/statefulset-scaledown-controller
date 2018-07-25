@@ -24,18 +24,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"encoding/json"
 	"k8s.io/apimachinery/pkg/labels"
+
 	"sort"
-	"strconv"
-	"strings"
 )
-
-const AnnotationStatefulSet = "statefulsets.kubernetes.io/drainer-pod-owner" // TODO: can we replace this with an OwnerReference with the StatefulSet as the owner?
-const AnnotationDrainerPodTemplate = "statefulsets.kubernetes.io/drainer-pod-template"
-
-const LabelDrainPod = "drain-pod"
 
 const (
 	SuccessCreate    = "SuccessfulCreate"
@@ -199,82 +191,6 @@ func (c *Controller) deleteDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1
 		c.recorder.Event(sts, corev1.EventTypeNormal, PodDeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, pod.Name, sts.Name))
 	}
 	return nil
-}
-
-func isDrainPod(pod *corev1.Pod) bool {
-	return pod != nil && pod.ObjectMeta.Annotations[AnnotationStatefulSet] != ""
-}
-
-func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
-
-	podTemplateJson := sts.Annotations[AnnotationDrainerPodTemplate]
-	if podTemplateJson == "" {
-		return nil, fmt.Errorf("No drain pod template configured for StatefulSet %s.", sts.Name)
-	}
-	pod := corev1.Pod{}
-	err := json.Unmarshal([]byte(podTemplateJson), &pod)
-	if err != nil {
-		return nil, fmt.Errorf("Can't unmarshal DrainerPodTemplate JSON from annotation: %s", err)
-	}
-
-	pod.Name = getPodName(sts, ordinal)
-	pod.Namespace = sts.Namespace
-
-	if pod.Labels == nil {
-		pod.Labels = map[string]string{}
-	}
-	pod.Labels[LabelDrainPod] = pod.Name
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
-	}
-	pod.Annotations[AnnotationStatefulSet] = sts.Name
-
-	// TODO: cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: User "system:serviceaccount:kube-system:statefulset-drain-controller" cannot update statefulsets/finalizers.apps
-	//if pod.OwnerReferences == nil {
-	//	pod.OwnerReferences = []metav1.OwnerReference{}
-	//}
-	//pod.OwnerReferences = append(pod.OwnerReferences, *metav1.NewControllerRef(sts, schema.GroupVersionKind{
-	//	Group:   appsv1beta1.SchemeGroupVersion.Group,
-	//	Version: appsv1beta1.SchemeGroupVersion.Version,
-	//	Kind:    "StatefulSet",
-	//}))
-
-	pod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
-
-	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{ // TODO: override existing volumes with the same name
-			Name: pvcTemplate.Name,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: getPVCName(sts, pvcTemplate.Name, int32(ordinal)),
-				},
-			},
-		})
-	}
-
-	return &pod, nil
-}
-
-func getPodName(sts *appsv1.StatefulSet, ordinal int) string {
-	return fmt.Sprintf("%s-%d", sts.Name, ordinal)
-}
-
-func getPVCName(sts *appsv1.StatefulSet, volumeClaimName string, ordinal int32) string {
-	return fmt.Sprintf("%s-%s-%d", volumeClaimName, sts.Name, ordinal)
-}
-
-func extractNameAndOrdinal(pvcName string) (string, int, error) {
-	idx := strings.LastIndexAny(pvcName, "-")
-	if idx == -1 {
-		return "", 0, fmt.Errorf("PVC not created by a StatefulSet")
-	}
-
-	name := pvcName[:idx]
-	ordinal, err := strconv.Atoi(pvcName[idx+1:])
-	if err != nil {
-		return "", 0, fmt.Errorf("PVC not created by a StatefulSet")
-	}
-	return name, ordinal, nil
 }
 
 func getStatefulSetNameFromPodAnnotation(object metav1.Object) string {
