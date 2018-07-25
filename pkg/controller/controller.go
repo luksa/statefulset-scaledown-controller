@@ -88,21 +88,10 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 			if pod == nil { // TODO: what if the PVC doesn't exist here (or what if it's deleted just after we create the pod)
 				glog.Infof("Found orphaned PVC(s) for ordinal '%d'. Creating drain pod '%s'.", ordinal, podName)
 
-				pod, err := newPod(sts, ordinal)
+				err = c.createDrainPod(sts, ordinal)
 				if err != nil {
-					return fmt.Errorf("Can't create drain Pod object: %s", err)
-				}
-				pod, err = c.kubeclientset.CoreV1().Pods(sts.Namespace).Create(pod)
-
-				// If an error occurs during Create, we'll requeue the item so we can
-				// attempt processing again later. This could have been caused by a
-				// temporary network failure, or any other transient reason.
-				if err != nil {
-					glog.Errorf("Error while creating drain Pod %s: %s", podName, err)
 					return err
 				}
-
-				c.recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageDrainPodCreated, podName, sts.Name))
 
 				if sts.Spec.PodManagementPolicy == appsv1.OrderedReadyPodManagement {
 					// don't create additional drain pods; they will be created in one of the
@@ -162,6 +151,25 @@ func (c *Controller) getClaims(sts *appsv1.StatefulSet) (claimsGroupedByOrdinal 
 	}
 
 	return claims, nil
+}
+
+func (c *Controller) createDrainPod(sts *appsv1.StatefulSet, ordinal int) error {
+	pod, err := newPod(sts, ordinal)
+	if err != nil {
+		return fmt.Errorf("Can't create drain Pod object: %s", err)
+	}
+	pod, err = c.kubeclientset.CoreV1().Pods(sts.Namespace).Create(pod)
+
+	// If an error occurs during Create, we'll requeue the item so we can
+	// attempt processing again later. This could have been caused by a
+	// temporary network failure, or any other transient reason.
+	if err != nil {
+		glog.Errorf("Error creating drain Pod: %s", err)
+		return err
+	}
+
+	c.recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageDrainPodCreated, pod.Name, sts.Name))
+	return nil
 }
 
 func (c *Controller) deleteDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
