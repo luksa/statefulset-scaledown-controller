@@ -71,7 +71,7 @@ func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 			Name: pvcTemplate.Name,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: getPVCName(sts, pvcTemplate.Name, int32(ordinal)),
+					ClaimName: getPVCName(sts, pvcTemplate.Name, ordinal),
 				},
 			},
 		})

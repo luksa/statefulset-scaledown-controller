@@ -171,7 +171,7 @@ func (c *Controller) deleteDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1
 		c.recorder.Event(sts, corev1.EventTypeNormal, DrainSuccess, fmt.Sprintf(MessageDrainPodFinished, pod.Name, sts.Name))
 
 		for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
-			pvcName := getPVCName(sts, pvcTemplate.Name, int32(ordinal))
+			pvcName := getPVCName(sts, pvcTemplate.Name, ordinal)
 			glog.Infof("Deleting PVC %s", pvcName)
 			err := c.kubeclientset.CoreV1().PersistentVolumeClaims(sts.Namespace).Delete(pvcName, nil)
 			if err != nil {

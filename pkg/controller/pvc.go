@@ -24,7 +24,7 @@ import (
 	"strings"
 )
 
-func getPVCName(sts *appsv1.StatefulSet, volumeClaimName string, ordinal int32) string {
+func getPVCName(sts *appsv1.StatefulSet, volumeClaimName string, ordinal int) string {
 	return fmt.Sprintf("%s-%s-%d", volumeClaimName, sts.Name, ordinal)
 }
 
