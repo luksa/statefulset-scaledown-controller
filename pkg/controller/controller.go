@@ -100,16 +100,12 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 			}
 		}
 
-		// Is it a drain pod or a regular stateful pod?
-		if isDrainPod(pod) {
-			err = c.deleteDrainPodIfNeeded(sts, pod, ordinal)
+		if isDrainPod(pod) && pod.Status.Phase == corev1.PodSucceeded {
+			glog.Infof("Drain pod '%s' finished. Deleting it and its PVCs.", pod.Name)
+			err = c.deleteDrainPodAndClaims(sts, pod, ordinal)
 			if err != nil {
 				return err
 			}
-		} else {
-			// DO nothing. Pod is a regular stateful pod
-			//glog.Infof("Pod '%s' exists. Not taking any action.", podName)
-			//return nil
 		}
 	}
 
@@ -169,32 +165,28 @@ func (c *Controller) createDrainPod(sts *appsv1.StatefulSet, ordinal int) error 
 	return nil
 }
 
-func (c *Controller) deleteDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
-	// Drain Pod already exists. Check if it's done draining.
-	if pod.Status.Phase == corev1.PodSucceeded {
-		glog.Infof("Drain pod '%s' finished.", pod.Name)
-		c.recorder.Event(sts, corev1.EventTypeNormal, DrainSuccess, fmt.Sprintf(MessageDrainPodFinished, pod.Name, sts.Name))
+func (c *Controller) deleteDrainPodAndClaims(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
+	c.recorder.Event(sts, corev1.EventTypeNormal, DrainSuccess, fmt.Sprintf(MessageDrainPodFinished, pod.Name, sts.Name))
 
-		for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
-			pvcName := getPVCName(sts, pvcTemplate.Name, ordinal)
-			glog.Infof("Deleting PVC %s", pvcName)
-			err := c.kubeclientset.CoreV1().PersistentVolumeClaims(sts.Namespace).Delete(pvcName, nil)
-			if err != nil {
-				return err
-			}
-			c.recorder.Event(sts, corev1.EventTypeNormal, PVCDeleteSuccess, fmt.Sprintf(MessagePVCDeleted, pvcName, sts.Name))
-		}
-
-		// TODO what if the user scales up the statefulset and the statefulset controller creates the new pod after we delete the pod but before we delete the PVC
-		// TODO what if we crash after we delete the PVC, but before we delete the pod?
-
-		glog.Infof("Deleting drain pod %s", pod.Name)
-		err := c.kubeclientset.CoreV1().Pods(sts.Namespace).Delete(pod.Name, nil)
+	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
+		pvcName := getPVCName(sts, pvcTemplate.Name, ordinal)
+		glog.Infof("Deleting PVC %s", pvcName)
+		err := c.kubeclientset.CoreV1().PersistentVolumeClaims(sts.Namespace).Delete(pvcName, nil)
 		if err != nil {
 			return err
 		}
-		c.recorder.Event(sts, corev1.EventTypeNormal, PodDeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, pod.Name, sts.Name))
+		c.recorder.Event(sts, corev1.EventTypeNormal, PVCDeleteSuccess, fmt.Sprintf(MessagePVCDeleted, pvcName, sts.Name))
 	}
+
+	// TODO what if the user scales up the statefulset and the statefulset controller creates the new pod after we delete the pod but before we delete the PVC
+	// TODO what if we crash after we delete the PVC, but before we delete the pod?
+
+	glog.Infof("Deleting drain pod %s", pod.Name)
+	err := c.kubeclientset.CoreV1().Pods(sts.Namespace).Delete(pod.Name, nil)
+	if err != nil {
+		return err
+	}
+	c.recorder.Event(sts, corev1.EventTypeNormal, PodDeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, pod.Name, sts.Name))
 	return nil
 }
 
