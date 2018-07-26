@@ -57,9 +57,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 
 	claimsGroupedByOrdinal, err := c.getClaims(sts)
 	if err != nil {
-		err = fmt.Errorf("Error while getting list of PVCs in namespace %s: %s", sts.Namespace, err)
-		glog.Error(err)
-		return err
+		return fmt.Errorf("Error getting list of PVCs in namespace %s: %s", sts.Namespace, err)
 	}
 
 	ordinals := extractOrdinals(claimsGroupedByOrdinal)
@@ -72,8 +70,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		podName := getPodName(sts, ordinal)
 		pod, err := c.podLister.Pods(sts.Namespace).Get(podName)
 		if err != nil && !errors.IsNotFound(err) {
-			glog.Errorf("Error while getting Pod %s: %s", podName, err)
-			return err
+			return fmt.Errorf("Error getting Pod %s: %s", podName, err)
 		}
 
 		// TODO: scale down to zero? should what happens on such events be configurable? there may or may not be anywhere to drain to
@@ -157,8 +154,7 @@ func (c *Controller) createDrainPod(sts *appsv1.StatefulSet, ordinal int) error 
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
-		glog.Errorf("Error creating drain Pod: %s", err)
-		return err
+		return fmt.Errorf("Error creating drain Pod: %s", err)
 	}
 
 	c.recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageDrainPodCreated, pod.Name, sts.Name))
