@@ -62,10 +62,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		return err
 	}
 
-	ordinals := make([]int, 0, len(claimsGroupedByOrdinal))
-	for k := range claimsGroupedByOrdinal {
-		ordinals = append(ordinals, k)
-	}
+	ordinals := extractOrdinals(claimsGroupedByOrdinal)
 	sort.Sort(sort.Reverse(sort.IntSlice(ordinals)))
 
 	for _, ordinal := range ordinals {
@@ -203,4 +200,12 @@ func (c *Controller) deleteDrainPodIfNeeded(sts *appsv1.StatefulSet, pod *corev1
 
 func getStatefulSetNameFromPodAnnotation(object metav1.Object) string {
 	return object.GetAnnotations()[AnnotationStatefulSet]
+}
+
+func extractOrdinals(m map[int][]*corev1.PersistentVolumeClaim) []int {
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
