@@ -19,10 +19,37 @@ package controller
 import (
 	"fmt"
 
+	"github.com/golang/glog"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"strconv"
 	"strings"
 )
+
+func filterAndGroupClaimsByOrdinal(allClaims []*corev1.PersistentVolumeClaim, sts *appsv1.StatefulSet) map[int][]*corev1.PersistentVolumeClaim {
+	claims := map[int][]*corev1.PersistentVolumeClaim{}
+	for _, pvc := range allClaims {
+		if pvc.DeletionTimestamp != nil {
+			glog.Infof("PVC '%s' is being deleted. Ignoring it.", pvc.Name)
+			continue
+		}
+
+		name, ordinal, err := extractNameAndOrdinal(pvc.Name)
+		if err != nil {
+			continue
+		}
+
+		for _, t := range sts.Spec.VolumeClaimTemplates {
+			if name == fmt.Sprintf("%s-%s", t.Name, sts.Name) {
+				if claims[ordinal] == nil {
+					claims[ordinal] = []*corev1.PersistentVolumeClaim{}
+				}
+				claims[ordinal] = append(claims[ordinal], pvc)
+			}
+		}
+	}
+	return claims
+}
 
 func getPVCName(sts *appsv1.StatefulSet, volumeClaimName string, ordinal int) string {
 	return fmt.Sprintf("%s-%s-%d", volumeClaimName, sts.Name, ordinal)

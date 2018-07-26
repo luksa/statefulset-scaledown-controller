@@ -117,30 +117,7 @@ func (c *Controller) getClaims(sts *appsv1.StatefulSet) (claimsGroupedByOrdinal 
 		return nil, err
 	}
 
-	claims := map[int][]*corev1.PersistentVolumeClaim{}
-
-	for _, pvc := range allClaims {
-		if pvc.DeletionTimestamp != nil {
-			glog.Infof("PVC '%s' is being deleted. Ignoring it.", pvc.Name)
-			continue
-		}
-
-		name, ordinal, err := extractNameAndOrdinal(pvc.Name)
-		if err != nil {
-			continue
-		}
-
-		for _, t := range sts.Spec.VolumeClaimTemplates {
-			if name == fmt.Sprintf("%s-%s", t.Name, sts.Name) {
-				if claims[ordinal] == nil {
-					claims[ordinal] = []*corev1.PersistentVolumeClaim{}
-				}
-				claims[ordinal] = append(claims[ordinal], pvc)
-			}
-		}
-	}
-
-	return claims, nil
+	return filterAndGroupClaimsByOrdinal(allClaims, sts), nil
 }
 
 func (c *Controller) createDrainPod(sts *appsv1.StatefulSet, ordinal int) error {
