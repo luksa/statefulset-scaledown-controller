@@ -64,9 +64,6 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(ordinals)))
 
 	for _, ordinal := range ordinals {
-
-		// TODO check if the number of claims matches the number of StatefulSet's volumeClaimTemplates. What if it doesn't?
-
 		podName := getPodName(sts, ordinal)
 		pod, err := c.podLister.Pods(sts.Namespace).Get(podName)
 		if err != nil && !errors.IsNotFound(err) {

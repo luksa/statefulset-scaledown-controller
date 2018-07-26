@@ -366,32 +366,14 @@ func TestMultipleVolumeClaimTemplates(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
-	sts.Spec.VolumeClaimTemplates = append(sts.Spec.VolumeClaimTemplates,
-		corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "other",
-			},
-			Spec: corev1.PersistentVolumeClaimSpec{},
-		})
-	sts.Spec.Template.Spec.Containers[0].VolumeMounts = append(sts.Spec.Template.Spec.Containers[0].VolumeMounts,
-		corev1.VolumeMount{
-			Name:      "other",
-			MountPath: "/var/other",
-		})
+	sts.Spec.VolumeClaimTemplates = append(sts.Spec.VolumeClaimTemplates, newVolumeClaimTemplate("other"))
+	sts.Spec.Template.Spec.Containers[0].VolumeMounts = append(sts.Spec.Template.Spec.Containers[0].VolumeMounts, newVolumeMount("other", "/var/other"))
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 	f.addPersistentVolumeClaims(newCustomPersistentVolumeClaims("other", "my-statefulset", 2)...)
 
 	expectedPod := newDrainPod(1)
-	expectedPod.Spec.Volumes = append(expectedPod.Spec.Volumes,
-		corev1.Volume{
-			Name: "other",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: fmt.Sprintf("other-my-statefulset-%d", 1),
-				},
-			},
-		})
+	expectedPod.Spec.Volumes = append(expectedPod.Spec.Volumes, newVolume("other"))
 	f.expectCreatePodAction(expectedPod)
 
 	f.run(sts)
@@ -407,7 +389,33 @@ func TestMultipleVolumeClaimTemplates(t *testing.T) {
 	f.run(sts)
 }
 
-// TODO: two volumeClaimTemplates, but one PVC is missing
+// Imagine having a StatefulSet with two volumeClaimTemplates. If a scale-down occurs
+// and for some reason one of those PVCs is deleted by someone, should the controller
+// create the cleanup pod or not?
+// - If it creates it, the pod won't be scheduled because of the missing PVC. If the
+//   StatefulSet is then scaled up, the StatefulSet controller will first create the
+//   PVC, allowing the cleanup controller to finally run. Once it finishes, the
+//   StatefulSet controller will create the regular pod again.
+// - If it doesn't create the cleanup pod and then the StatefulSet controller is
+//   scaled up, the regular pod will be created instead of the cleanup pod.
+// Currently, the controller works as described in the first bullet.
+func TestMultipleVolumeClaimTemplatesWithOnePVCMissing(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	sts.Spec.VolumeClaimTemplates = append(sts.Spec.VolumeClaimTemplates, newVolumeClaimTemplate("other"))
+	sts.Spec.Template.Spec.Containers[0].VolumeMounts = append(sts.Spec.Template.Spec.Containers[0].VolumeMounts, newVolumeMount("other", "/var/other"))
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
+	f.addPersistentVolumeClaims(newCustomPersistentVolumeClaims("other", "my-statefulset", 1)...) // note that PVC with ordinal 1 is missing
+
+	expectedPod := newDrainPod(1)
+	expectedPod.Spec.Volumes = append(expectedPod.Spec.Volumes, newVolume("other"))
+	f.expectCreatePodAction(expectedPod)
+
+	f.run(sts)
+}
+
 // TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
 // TODO: StatefulSet deleted while drain pod is running
 
@@ -537,6 +545,33 @@ func newDrainPodTemplateSpec() *corev1.PodTemplateSpec {
 				},
 			},
 		},
+	}
+}
+
+func newVolumeClaimTemplate(name string) corev1.PersistentVolumeClaim {
+	return corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{},
+	}
+}
+
+func newVolume(name string) corev1.Volume {
+	return corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: fmt.Sprintf("%s-my-statefulset-%d", name, 1),
+			},
+		},
+	}
+}
+
+func newVolumeMount(name, mountPath string) corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      name,
+		MountPath: mountPath,
 	}
 }
 
