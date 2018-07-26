@@ -464,9 +464,6 @@ func newPersistentVolumeClaim(templateName, statefulSetName string, ordinal int)
 				"app": "my-app",
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-		},
 	}
 }
 
@@ -515,9 +512,6 @@ func newStatefulSet() *appsv1.StatefulSet {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "data",
 					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					},
 				},
 			},
 		},
@@ -553,7 +547,6 @@ func newVolumeClaimTemplate(name string) corev1.PersistentVolumeClaim {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{},
 	}
 }
 
