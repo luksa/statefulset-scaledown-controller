@@ -58,13 +58,13 @@ func getPVCName(sts *appsv1.StatefulSet, volumeClaimName string, ordinal int) st
 func extractNameAndOrdinal(pvcName string) (string, int, error) {
 	idx := strings.LastIndexAny(pvcName, "-")
 	if idx == -1 {
-		return "", 0, fmt.Errorf("PVC not created by a StatefulSet")
+		return "", 0, fmt.Errorf("PVC does not belong to a StatefulSet")
 	}
 
 	name := pvcName[:idx]
 	ordinal, err := strconv.Atoi(pvcName[idx+1:])
 	if err != nil {
-		return "", 0, fmt.Errorf("PVC not created by a StatefulSet")
+		return "", 0, fmt.Errorf("PVC does not belong to a StatefulSet")
 	}
 	return name, ordinal, nil
 }
