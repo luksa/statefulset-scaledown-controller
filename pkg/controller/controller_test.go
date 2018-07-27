@@ -254,7 +254,7 @@ func getKey(sts *appsv1.StatefulSet, t *testing.T) string {
 func TestIgnoresStatefulSetsWithoutVolumeClaimTemplates(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
-	sts.Spec.Replicas = int32Ptr(3)
+	sts.Spec.Replicas = int32Ptr(1)
 	sts.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{}
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
@@ -265,7 +265,7 @@ func TestIgnoresStatefulSetsWithoutVolumeClaimTemplates(t *testing.T) {
 func TestIgnoresStatefulSetsWithoutDrainPodTemplate(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
-	sts.Spec.Replicas = int32Ptr(3)
+	sts.Spec.Replicas = int32Ptr(1)
 	delete(sts.ObjectMeta.Annotations, annotation)
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
