@@ -30,10 +30,9 @@ import (
 )
 
 const (
-	SuccessCreate    = "SuccessfulCreate"
-	DrainSuccess     = "DrainSuccess"
-	PVCDeleteSuccess = "SuccessfulPVCDelete"
-	PodDeleteSuccess = "SuccessfulDelete"
+	SuccessCreate = "SuccessfulCreate"
+	DrainSuccess  = "DrainSuccess"
+	DeleteSuccess = "SuccessfulDelete"
 
 	MessageDrainPodCreated  = "create Drain Pod %s in StatefulSet %s successful"
 	MessageDrainPodFinished = "drain Pod %s in StatefulSet %s completed successfully"
@@ -145,7 +144,7 @@ func (c *Controller) deleteDrainPodAndClaims(sts *appsv1.StatefulSet, pod *corev
 		if err != nil {
 			return err
 		}
-		c.recorder.Event(sts, corev1.EventTypeNormal, PVCDeleteSuccess, fmt.Sprintf(MessagePVCDeleted, pvcName, sts.Name))
+		c.recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessagePVCDeleted, pvcName, sts.Name))
 	}
 
 	// TODO what if the user scales up the statefulset and the statefulset controller creates the new pod after we delete the pod but before we delete the PVC
@@ -156,7 +155,7 @@ func (c *Controller) deleteDrainPodAndClaims(sts *appsv1.StatefulSet, pod *corev
 	if err != nil {
 		return err
 	}
-	c.recorder.Event(sts, corev1.EventTypeNormal, PodDeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, pod.Name, sts.Name))
+	c.recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, pod.Name, sts.Name))
 	return nil
 }
 
