@@ -273,6 +273,40 @@ func TestIgnoresStatefulSetsWithoutDrainPodTemplate(t *testing.T) {
 	f.run(sts)
 }
 
+func TestNonJsonPodTemplate(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	sts.ObjectMeta.Annotations[annotation] = "{bad json"
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
+
+	f.runExpectError(sts)
+}
+
+func TestInvalidPodTemplateJson(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	sts.ObjectMeta.Annotations[annotation] = `{"spec": {"containers": {"name": "containers should be an array"}}}`
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
+
+	f.runExpectError(sts)
+}
+
+// TODO: the controller doesn't return an error in this case, but it should
+func Ignored_TestNonPodTemplateJson(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.Spec.Replicas = int32Ptr(1)
+	sts.ObjectMeta.Annotations[annotation] = `{"foo": "this is valid json, but not a pod template"}`
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
+
+	f.runExpectError(sts)
+}
+
 func TestDoesNothingWhenPVCsMatchReplicaCount(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
