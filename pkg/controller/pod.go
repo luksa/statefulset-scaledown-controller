@@ -64,7 +64,11 @@ func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 	//	Kind:    "StatefulSet",
 	//}))
 
-	pod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+	if pod.Spec.RestartPolicy == "" {
+		pod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+	} else if pod.Spec.RestartPolicy != corev1.RestartPolicyOnFailure {
+		return nil, fmt.Errorf("Drain pod template must use restartPolicy: OnFailure")
+	}
 
 	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{ // TODO: override existing volumes with the same name
