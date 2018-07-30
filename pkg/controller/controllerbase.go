@@ -94,7 +94,7 @@ func NewController(
 	}
 
 	glog.Info("Setting up event handlers")
-	// Set up an event handler for when Foo resources change
+	// Set up an event handler for when StatefulSet resources change
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueStatefulSet,
 		UpdateFunc: func(old, new interface{}) {

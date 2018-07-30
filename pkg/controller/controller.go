@@ -170,3 +170,5 @@ func extractOrdinals(m map[int][]*corev1.PersistentVolumeClaim) []int {
 	}
 	return keys
 }
+
+// TODO: prevent sts controller from deleting pod-1 while pod-2 drain pod is running (using finalizers on pods?)
