@@ -40,8 +40,8 @@ import (
 const controllerAgentName = "statefulset-drain-controller"
 
 type Controller struct {
-	// kubeclientset is a standard kubernetes clientset
-	kubeclientset kubernetes.Interface
+	// kubeclient is a standard kubernetes clientset
+	kubeclient kubernetes.Interface
 
 	statefulSetLister  appslisters.StatefulSetLister
 	statefulSetsSynced cache.InformerSynced
@@ -82,7 +82,7 @@ func NewController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
 
 	controller := &Controller{
-		kubeclientset:      kubeclientset,
+		kubeclient:         kubeclientset,
 		statefulSetLister:  statefulSetInformer.Lister(),
 		statefulSetsSynced: statefulSetInformer.Informer().HasSynced,
 		pvcLister:          pvcInformer.Lister(),

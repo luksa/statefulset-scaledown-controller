@@ -121,7 +121,7 @@ func (c *Controller) createDrainPod(sts *appsv1.StatefulSet, ordinal int) error 
 	if err != nil {
 		return fmt.Errorf("Can't create drain Pod object: %s", err)
 	}
-	pod, err = c.kubeclientset.CoreV1().Pods(sts.Namespace).Create(pod)
+	pod, err = c.kubeclient.CoreV1().Pods(sts.Namespace).Create(pod)
 
 	// If an error occurs during Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
@@ -140,7 +140,7 @@ func (c *Controller) deleteDrainPodAndClaims(sts *appsv1.StatefulSet, pod *corev
 	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
 		pvcName := getPVCName(sts, pvcTemplate.Name, ordinal)
 		glog.Infof("Deleting PVC %s", pvcName)
-		err := c.kubeclientset.CoreV1().PersistentVolumeClaims(sts.Namespace).Delete(pvcName, nil)
+		err := c.kubeclient.CoreV1().PersistentVolumeClaims(sts.Namespace).Delete(pvcName, nil)
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func (c *Controller) deleteDrainPodAndClaims(sts *appsv1.StatefulSet, pod *corev
 	// TODO what if we crash after we delete the PVC, but before we delete the pod?
 
 	glog.Infof("Deleting drain pod %s", pod.Name)
-	err := c.kubeclientset.CoreV1().Pods(sts.Namespace).Delete(pod.Name, nil)
+	err := c.kubeclient.CoreV1().Pods(sts.Namespace).Delete(pod.Name, nil)
 	if err != nil {
 		return err
 	}
