@@ -36,7 +36,7 @@ of these modes.
 $ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-drain-controller/master/artifacts/cluster-scoped.yaml
 ```
 
-### Running a controller per namespace
+### Running controller in a single namespace
 ```bash
 $ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-drain-controller/master/artifacts/per-namespace.yaml
 ```
@@ -129,3 +129,9 @@ data-datastore-0   Bound     pvc-57224b8f-...   1Mi        ...
 data-datastore-1   Bound     pvc-5acaf078-...   1Mi        ...
 ```
 
+
+## Known issues
+
+Please be aware of the following issues:
+- If the StatefulSet is deleted, the controller currently does not create any cleanup pods. Please scale down the StatefulSet to zero, wait for all the cleanup pods to finish, and only then delete the StatefulSet.  
+- If the StatefulSet is deleted while a cleanup pod is running, the pod is never deleted by the controller. Please delete the pod manually or scale downthe StatefulSet to zero before deleting it, as described above.
