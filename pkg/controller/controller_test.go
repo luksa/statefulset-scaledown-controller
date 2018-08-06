@@ -450,10 +450,23 @@ func TestMultipleVolumeClaimTemplatesWithOnePVCMissing(t *testing.T) {
 	f.run(sts)
 }
 
+func TestCreatesPodOnStatefulSetDelete(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	now := metav1.Now()
+	sts.ObjectMeta.DeletionTimestamp = &now
+	f.addStatefulSets(sts)
+	f.addPersistentVolumeClaims(newPersistentVolumeClaims(3)...)
+
+	expectedPod := newDrainPod(2)
+	f.expectCreatePodAction(expectedPod)
+
+	f.run(sts)
+}
+
 // TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
 // TODO: StatefulSet deleted while drain pod is running
 // TODO: drain pod has same labels as regular pods (check what happens; do we need to prevent that?)
-// TODO: delete sts - the drain pod should run!
 // TODO: delete sts while drain pod running - should delete the drain pod when it completes
 // TODO: scale down, wait for drain pod to run, scale back up and back down - will the sts controller delete the drain pod?
 

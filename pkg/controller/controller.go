@@ -70,7 +70,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		}
 
 		// TODO: scale down to zero? should what happens on such events be configurable? there may or may not be anywhere to drain to
-		if int32(ordinal) >= *sts.Spec.Replicas {
+		if int32(ordinal) >= *sts.Spec.Replicas || sts.ObjectMeta.DeletionTimestamp != nil {
 			// PVC exists, but its ordinal is higher than the current last stateful pod's ordinal;
 			// this means the PVC is an orphan and should be drained & deleted
 
