@@ -38,6 +38,8 @@ const (
 	MessageDrainPodFinished = "drain Pod %s in StatefulSet %s completed successfully"
 	MessageDrainPodDeleted  = "delete Drain Pod %s in StatefulSet %s successful"
 	MessagePVCDeleted       = "delete Claim %s in StatefulSet %s successful"
+
+	FinalizerName = "statefulsets.kubernetes.io/scaledown"
 )
 
 func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
@@ -61,6 +63,15 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 
 	ordinals := extractOrdinals(claimsGroupedByOrdinal)
 	sort.Sort(sort.Reverse(sort.IntSlice(ordinals)))
+
+	finalizers := sts.ObjectMeta.Finalizers
+	if len(ordinals) == 0 && sts.ObjectMeta.DeletionTimestamp != nil && len(finalizers) > 0 && finalizers[0] == FinalizerName {
+		err := c.removeFinalizer(sts)
+		if err != nil {
+			return fmt.Errorf("Error removing finalizer from StatefulSet %s/%s: %s", sts.Namespace, sts.Name, err)
+		}
+		return nil
+	}
 
 	for _, ordinal := range ordinals {
 		podName := getPodName(sts, ordinal)
@@ -172,3 +183,14 @@ func extractOrdinals(m map[int][]*corev1.PersistentVolumeClaim) []int {
 }
 
 // TODO: prevent sts controller from deleting pod-1 while pod-2 drain pod is running (using finalizers on pods?)
+
+func (c *Controller) removeFinalizer(sts *appsv1.StatefulSet) error {
+	glog.Infof("Removing finalizer from StatefulSet %s/%s", sts.Namespace, sts.Name)
+	if sts.ObjectMeta.Finalizers[0] != FinalizerName {
+		panic("should never come to this")
+	}
+
+	sts.ObjectMeta.Finalizers = sts.ObjectMeta.Finalizers[1:]
+	_, err := c.kubeclient.AppsV1().StatefulSets(sts.Namespace).Update(sts)
+	return err
+}

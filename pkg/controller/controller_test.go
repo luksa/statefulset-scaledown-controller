@@ -230,8 +230,16 @@ func (f *fixture) expectDeletePVCAction(namespace, name string) {
 	f.expectDeleteAction("persistentvolumeclaims", namespace, name)
 }
 
+func (f *fixture) expectUpdateStatefulSetAction(p *appsv1.StatefulSet) {
+	f.expectUpdateAction("statefulsets", p.Namespace, p)
+}
+
 func (f *fixture) expectCreateAction(resource string, namespace string, obj runtime.Object) {
 	f.expectAction(core.NewCreateAction(schema.GroupVersionResource{Resource: resource}, namespace, obj))
+}
+
+func (f *fixture) expectUpdateAction(resource, namespace string, obj runtime.Object) {
+	f.expectAction(core.NewUpdateAction(schema.GroupVersionResource{Resource: resource}, namespace, obj))
 }
 
 func (f *fixture) expectDeleteAction(resource, namespace, name string) {
@@ -464,10 +472,24 @@ func TestCreatesPodOnStatefulSetDelete(t *testing.T) {
 	f.run(sts)
 }
 
+func TestRemovesFinalizerWhenFinished(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	now := metav1.Now()
+	sts.ObjectMeta.DeletionTimestamp = &now
+	f.addStatefulSets(sts)
+	// NOTE: no PVCs, which means the controller has nothing to do and should remove the finalizer
+
+	updatedSts := sts.DeepCopy()
+	updatedSts.ObjectMeta.Finalizers = []string{}
+	f.expectUpdateStatefulSetAction(updatedSts)
+
+	f.run(sts)
+}
+
 // TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
 // TODO: StatefulSet deleted while drain pod is running
 // TODO: drain pod has same labels as regular pods (check what happens; do we need to prevent that?)
-// TODO: delete sts while drain pod running - should delete the drain pod when it completes
 // TODO: scale down, wait for drain pod to run, scale back up and back down - will the sts controller delete the drain pod?
 
 func newDrainPod(ordinal int) *corev1.Pod {
@@ -526,6 +548,9 @@ func newStatefulSet() *appsv1.StatefulSet {
 			Namespace: metav1.NamespaceDefault,
 			Annotations: map[string]string{
 				annotation: toJSON(newDrainPodTemplateSpec()),
+			},
+			Finalizers: []string{
+				FinalizerName,
 			},
 		},
 		Spec: appsv1.StatefulSetSpec{
