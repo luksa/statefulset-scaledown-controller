@@ -472,6 +472,20 @@ func TestCreatesPodOnStatefulSetDelete(t *testing.T) {
 	f.run(sts)
 }
 
+func TestAddsFinalizer(t *testing.T) {
+	f := newFixture(t)
+	sts := newStatefulSet()
+	sts.ObjectMeta.Finalizers = []string{}
+	f.addStatefulSets(sts)
+	// NOTE: no PVCs, which means the controller has nothing to do and should remove the finalizer
+
+	updatedSts := sts.DeepCopy()
+	updatedSts.ObjectMeta.Finalizers = []string{FinalizerName}
+	f.expectUpdateStatefulSetAction(updatedSts)
+
+	f.run(sts)
+}
+
 func TestRemovesFinalizerWhenFinished(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()

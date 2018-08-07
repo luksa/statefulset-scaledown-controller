@@ -65,7 +65,21 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(ordinals)))
 
 	finalizers := sts.ObjectMeta.Finalizers
-	if len(ordinals) == 0 && sts.ObjectMeta.DeletionTimestamp != nil && len(finalizers) > 0 && finalizers[0] == FinalizerName {
+	statefulSetTerminating := sts.ObjectMeta.DeletionTimestamp != nil
+
+	if !statefulSetTerminating && !hasFinalizer(sts) {
+		// TODO: the finalizer should be added in a mutating webhook or initializer, not here (though adding it here is magnitudes easier)
+		glog.Infof("Adding finalizer to StatefulSet %s/%s", sts.Namespace, sts.Name)
+
+		sts.ObjectMeta.Finalizers = append(sts.ObjectMeta.Finalizers, FinalizerName)
+		_, err := c.kubeclient.AppsV1().StatefulSets(sts.Namespace).Update(sts)
+		if err != nil {
+			return fmt.Errorf("Error adding finalizer to StatefulSet %s/%s: %s", sts.Namespace, sts.Name, err)
+		}
+		return nil
+	}
+
+	if len(ordinals) == 0 && statefulSetTerminating && len(finalizers) > 0 && finalizers[0] == FinalizerName {
 		err := c.removeFinalizer(sts)
 		if err != nil {
 			return fmt.Errorf("Error removing finalizer from StatefulSet %s/%s: %s", sts.Namespace, sts.Name, err)
@@ -81,7 +95,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		}
 
 		// TODO: scale down to zero? should what happens on such events be configurable? there may or may not be anywhere to drain to
-		if int32(ordinal) >= *sts.Spec.Replicas || sts.ObjectMeta.DeletionTimestamp != nil {
+		if int32(ordinal) >= *sts.Spec.Replicas || statefulSetTerminating {
 			// PVC exists, but its ordinal is higher than the current last stateful pod's ordinal;
 			// this means the PVC is an orphan and should be drained & deleted
 
@@ -115,6 +129,15 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 
 	// TODO: add status annotation (what info?)
 	return nil
+}
+
+func hasFinalizer(sts *appsv1.StatefulSet) bool {
+	for _, f := range sts.ObjectMeta.Finalizers {
+		if f == FinalizerName {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Controller) getClaims(sts *appsv1.StatefulSet) (claimsGroupedByOrdinal map[int][]*corev1.PersistentVolumeClaim, err error) {
