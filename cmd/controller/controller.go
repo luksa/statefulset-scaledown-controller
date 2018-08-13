@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/luksa/statefulset-scaledown-controller/pkg/controller"
-	"github.com/luksa/statefulset-scaledown-controller/pkg/signals"
+	"github.com/jboss-openshift/statefulset-scaledown-controller/pkg/controller"
+	"github.com/jboss-openshift/statefulset-scaledown-controller/pkg/signals"
 	"io/ioutil"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
