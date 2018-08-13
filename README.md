@@ -33,12 +33,12 @@ of these modes.
 
 ### Running one controller for the whole cluster
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-scaledown-controller/master/artifacts/cluster-scoped.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/jboss-openshift/statefulset-scaledown-controller/master/artifacts/cluster-scoped.yaml
 ```
 
 ### Running controller in a single namespace
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-scaledown-controller/master/artifacts/per-namespace.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/jboss-openshift/statefulset-scaledown-controller/master/artifacts/per-namespace.yaml
 ```
 
 ## How to use
@@ -91,7 +91,7 @@ working properly, you should see a new `datastore-2` pod spin up and do its work
 the controller will delete the pod and the PersistentVolumeClaim.
 
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-scaledown-controller/master/example/statefulset.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/jboss-openshift/statefulset-scaledown-controller/master/example/statefulset.yaml
 
 ... wait for all three pod instances to start running before scaling down
 
