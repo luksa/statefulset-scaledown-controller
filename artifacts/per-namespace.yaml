@@ -1,53 +1,53 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: statefulset-drain-controller
+  name: statefulset-scaledown-controller
   labels:
-    app: statefulset-drain-controller
+    app: statefulset-scaledown-controller
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: statefulset-drain-controller
+      app: statefulset-scaledown-controller
   template:
     metadata:
       labels:
-        app: statefulset-drain-controller
+        app: statefulset-scaledown-controller
     spec:
-      serviceAccountName: statefulset-drain-controller
+      serviceAccountName: statefulset-scaledown-controller
       containers:
       - name: main
-        image: docker.io/luksa/statefulset-drain-controller:0.5
+        image: docker.io/luksa/statefulset-scaledown-controller:0.5
         args:
         - --localOnly
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: statefulset-drain-controller
+  name: statefulset-scaledown-controller
   labels:
-    app: statefulset-drain-controller
+    app: statefulset-scaledown-controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
-  name: statefulset-drain-controller
+  name: statefulset-scaledown-controller
   labels:
-    app: statefulset-drain-controller
+    app: statefulset-scaledown-controller
 subjects:
   - kind: ServiceAccount
-    name: statefulset-drain-controller
+    name: statefulset-scaledown-controller
 roleRef:
   kind: Role
-  name: statefulset-drain-controller
+  name: statefulset-scaledown-controller
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
-  name: statefulset-drain-controller
+  name: statefulset-scaledown-controller
   labels:
-    app: statefulset-drain-controller
+    app: statefulset-scaledown-controller
 rules:
 - apiGroups:
   - apps

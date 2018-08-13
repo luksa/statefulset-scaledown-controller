@@ -25,7 +25,7 @@ import (
 	"testing"
 )
 
-func TestIsDrainPod(t *testing.T) {
+func TestIsCleanupPod(t *testing.T) {
 	cases := []struct {
 		name     string
 		pod      *corev1.Pod
@@ -37,7 +37,7 @@ func TestIsDrainPod(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "drain pod",
+			name: "cleanup pod",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "some-pod",
@@ -64,8 +64,8 @@ func TestIsDrainPod(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if e, a := tc.expected, isDrainPod(tc.pod); e != a {
-				t.Errorf("Expected isDrainPod() to return %t, but got %t", e, a)
+			if e, a := tc.expected, isCleanupPod(tc.pod); e != a {
+				t.Errorf("Expected isCleanupPod() to return %t, but got %t", e, a)
 			}
 		})
 	}
@@ -142,8 +142,8 @@ func TestNewPod(t *testing.T) {
 					Name:      "my-sts-0",
 					Namespace: "my-namespace",
 					Labels: map[string]string{
-						"my-label":  "my-label-value",
-						"drain-pod": "my-sts-0",
+						"my-label":      "my-label-value",
+						"scaledown-pod": "my-sts-0",
 					},
 					Annotations: map[string]string{AnnotationStatefulSet: "my-sts"},
 				},
@@ -194,7 +194,7 @@ func TestNewPod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-sts-0",
 					Labels: map[string]string{
-						"drain-pod": "my-sts-0",
+						"scaledown-pod": "my-sts-0",
 					},
 					Annotations: map[string]string{AnnotationStatefulSet: "my-sts"},
 				},
@@ -253,8 +253,8 @@ func TestNewPod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-sts-0",
 					Labels: map[string]string{
-						"my-label":  "my-label-value",
-						"drain-pod": "my-sts-0",
+						"my-label":      "my-label-value",
+						"scaledown-pod": "my-sts-0",
 					},
 					Annotations: map[string]string{AnnotationStatefulSet: "my-sts"},
 				},

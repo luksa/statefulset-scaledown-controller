@@ -24,21 +24,21 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const AnnotationStatefulSet = "statefulsets.kubernetes.io/drainer-pod-owner" // TODO: can we replace this with an OwnerReference with the StatefulSet as the owner?
-const AnnotationDrainerPodTemplate = "statefulsets.kubernetes.io/drainer-pod-template"
+const AnnotationStatefulSet = "statefulsets.kubernetes.io/scaledown-pod-owner" // TODO: can we replace this with an OwnerReference with the StatefulSet as the owner?
+const AnnotationSclaedownPodTemplate = "statefulsets.kubernetes.io/scaledown-pod-template"
 
-const LabelDrainPod = "drain-pod"
+const LabelScaledownPod = "scaledown-pod"
 
 func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 
-	podTemplateJson := sts.Annotations[AnnotationDrainerPodTemplate]
+	podTemplateJson := sts.Annotations[AnnotationSclaedownPodTemplate]
 	if podTemplateJson == "" {
-		return nil, fmt.Errorf("No drain pod template configured for StatefulSet %s.", sts.Name)
+		return nil, fmt.Errorf("No cleanup pod template configured for StatefulSet %s.", sts.Name)
 	}
 	pod := corev1.Pod{}
 	err := json.Unmarshal([]byte(podTemplateJson), &pod)
 	if err != nil {
-		return nil, fmt.Errorf("Can't unmarshal DrainerPodTemplate JSON from annotation: %s", err)
+		return nil, fmt.Errorf("Can't unmarshal ScaledownPodTemplate JSON from annotation: %s", err)
 	}
 
 	pod.Name = getPodName(sts, ordinal)
@@ -47,14 +47,14 @@ func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 	if pod.Labels == nil {
 		pod.Labels = map[string]string{}
 	}
-	pod.Labels[LabelDrainPod] = pod.Name
+	pod.Labels[LabelScaledownPod] = pod.Name
 
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[AnnotationStatefulSet] = sts.Name
 
-	// TODO: cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: User "system:serviceaccount:kube-system:statefulset-drain-controller" cannot update statefulsets/finalizers.apps
+	// TODO: cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: User "system:serviceaccount:kube-system:statefulset-scaledown-controller" cannot update statefulsets/finalizers.apps
 	//if pod.OwnerReferences == nil {
 	//	pod.OwnerReferences = []metav1.OwnerReference{}
 	//}
@@ -67,7 +67,7 @@ func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 	if pod.Spec.RestartPolicy == "" {
 		pod.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
 	} else if pod.Spec.RestartPolicy != corev1.RestartPolicyOnFailure {
-		return nil, fmt.Errorf("Drain pod template must use restartPolicy: OnFailure")
+		return nil, fmt.Errorf("Scaledown pod template must use restartPolicy: OnFailure")
 	}
 
 	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
@@ -84,7 +84,7 @@ func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func isDrainPod(pod *corev1.Pod) bool {
+func isCleanupPod(pod *corev1.Pod) bool {
 	return pod != nil && pod.ObjectMeta.Annotations[AnnotationStatefulSet] != ""
 }
 

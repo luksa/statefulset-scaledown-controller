@@ -15,11 +15,11 @@ kind: StatefulSet
 metadata:
   name: datastore
   annotations:
-    statefulsets.kubernetes.io/drainer-pod-template: |
+    statefulsets.kubernetes.io/scaledown-pod-template: |
       {
         "metadata": {
           "labels": {
-            "app": "datastore-drainer"
+            "app": "datastore-cleanup"
           }
         },
         "spec": {
@@ -28,7 +28,7 @@ metadata:
             {
               "name": "main",
               "image": "busybox",
-              "command": ["/bin/sh", "-c", "echo \"Draining data... this takes 10 seconds!\" ; sleep 10 ; rm /var/data/test.txt; echo \"Data deleted!\""],
+              "command": ["/bin/sh", "-c", "echo \"Cleaning up data... this takes 10 seconds!\" ; sleep 10 ; rm /var/data/test.txt; echo \"Data deleted!\""],
               "volumeMounts": [
                 {
                   "name": "data",

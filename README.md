@@ -1,7 +1,7 @@
-# StatefulSet Drain Controller
+# StatefulSet Scale-Down Controller
 
-This repository implements a controller for draining orphaned PersistentVolumeClaims/PersistentVolumes
-when a StatefulSet is scaled down.
+This repository implements a controller for running user-defined cleanup jobs for
+orphaned PersistentVolumeClaims/PersistentVolumes when a StatefulSet is scaled down.
 
 
 ## Purpose
@@ -10,8 +10,8 @@ When a StatefulSet is scaled down and one of the stateful pod instances is remov
 PersistentVolumeClaim (and the underlying PersistentVolume) are left intact. The data stored on 
 the PersistentVolume remains inaccessible until the StatefulSet is scaled back up. In stateful 
 apps that use sharding, that may not be ideal. Those apps require the data to be redistributed to
-the remaining app instances. The StatefulSet Drain Controller allows you to specify a cleanup
-pod template in the StatefulSet spec, which will be used to create a new cleanup/drain pod that
+the remaining app instances. The StatefulSet Scale-Down Controller allows you to specify a cleanup
+pod template in the StatefulSet spec, which will be used to create a new cleanup pod that
 is attached to the PersistentVolume that was released by the scale down. The pod thus has access
 to the data of the removed pod instance and can do whatever the app requires with it (e.g. 
 redistribute it to the other instances or process it in a different way). Once the cleanup pod
@@ -33,18 +33,18 @@ of these modes.
 
 ### Running one controller for the whole cluster
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-drain-controller/master/artifacts/cluster-scoped.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-scaledown-controller/master/artifacts/cluster-scoped.yaml
 ```
 
 ### Running controller in a single namespace
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-drain-controller/master/artifacts/per-namespace.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-scaledown-controller/master/artifacts/per-namespace.yaml
 ```
 
 ## How to use
 Once the controller is running and you've created a container image that knows how to process 
-your data, you can add a drainer pod template to your StatefulSet spec by adding the annotation 
-`statefulsets.kubernetes.io/drainer-pod-template` as shown in the example:
+your data, you can add a cleanup pod template to your StatefulSet spec by adding the annotation 
+`statefulsets.kubernetes.io/scaledown-pod-template` as shown in the example:
 
 ```yaml
 apiVersion: apps/v1
@@ -52,18 +52,18 @@ kind: StatefulSet
 metadata:
   name: my-statefulset
   annotations:
-    statefulsets.kubernetes.io/drainer-pod-template: |
+    statefulsets.kubernetes.io/scaledown-pod-template: |
       {
         "metadata": {
           "labels": {
-            "app": "datastore-drainer"
+            "app": "datastore-cleanup"
           }
         },
         "spec": {
           "containers": [
             {
-              "name": "drainer",
-              "image": "my-drain-container",
+              "name": "cleanup",
+              "image": "my-cleanup-container",
               "volumeMounts": [
                 {
                   "name": "data",
@@ -91,7 +91,7 @@ working properly, you should see a new `datastore-2` pod spin up and do its work
 the controller will delete the pod and the PersistentVolumeClaim.
 
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-drain-controller/master/example/statefulset.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/luksa/statefulset-scaledown-controller/master/example/statefulset.yaml
 
 ... wait for all three pod instances to start running before scaling down
 
@@ -114,9 +114,9 @@ $ kubectl get po
 NAME          READY     STATUS    RESTARTS   AGE
 datastore-0   1/1       Running   0          3m
 datastore-1   1/1       Running   0          3m
-datastore-2   1/1       Running   0          5s    <-- the drain pod
+datastore-2   1/1       Running   0          5s    <-- the cleanup pod
 
-... wait approx. 10 seconds for the drain pod to finish
+... wait approx. 10 seconds for the cleanup pod to finish
 
 $ kubectl get po
 NAME          READY     STATUS    RESTARTS   AGE

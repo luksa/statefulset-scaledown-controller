@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/luksa/statefulset-scaledown-controller/pkg/controller"
+	"github.com/luksa/statefulset-scaledown-controller/pkg/signals"
+	"io/ioutil"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"github.com/luksa/statefulset-drain-controller/pkg/signals"
-	"github.com/luksa/statefulset-drain-controller/pkg/controller"
-	"io/ioutil"
 )
 
 var (
@@ -69,11 +69,11 @@ func main() {
 		kubeInformerFactory = kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	}
 
-	drainController := controller.NewController(kubeClient, kubeInformerFactory)
+	c := controller.NewController(kubeClient, kubeInformerFactory)
 
 	go kubeInformerFactory.Start(stopCh)
 
-	if err = drainController.Run(1, stopCh); err != nil {
+	if err = c.Run(1, stopCh); err != nil {
 		glog.Fatalf("Error running controller: %s", err.Error())
 	}
 }

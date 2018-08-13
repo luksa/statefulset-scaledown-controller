@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
-const controllerAgentName = "statefulset-drain-controller"
+const controllerAgentName = "statefulset-scaledown-controller"
 
 type Controller struct {
 	// kubeclient is a standard kubernetes clientset
@@ -73,8 +73,8 @@ func NewController(
 	podInformer := kubeInformerFactory.Core().V1().Pods()
 
 	// Create event broadcaster
-	// Add statefulset-drain-controller types to the default Kubernetes Scheme so Events can be
-	// logged for statefulset-drain-controller types.
+	// Add statefulset-scaledown-controller types to the default Kubernetes Scheme so Events can be
+	// logged for statefulset-scaledown-controller types.
 	glog.V(4).Info("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)

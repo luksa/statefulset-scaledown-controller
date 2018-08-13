@@ -30,14 +30,14 @@ import (
 )
 
 const (
-	SuccessCreate = "SuccessfulCreate"
-	DrainSuccess  = "DrainSuccess"
-	DeleteSuccess = "SuccessfulDelete"
+	SuccessCreate  = "SuccessfulCreate"
+	CleanupSuccess = "CleanupSuccess"
+	DeleteSuccess  = "SuccessfulDelete"
 
-	MessageDrainPodCreated  = "create Drain Pod %s in StatefulSet %s successful"
-	MessageDrainPodFinished = "drain Pod %s in StatefulSet %s completed successfully"
-	MessageDrainPodDeleted  = "delete Drain Pod %s in StatefulSet %s successful"
-	MessagePVCDeleted       = "delete Claim %s in StatefulSet %s successful"
+	MessageCleanupPodCreated  = "create Cleanup Pod %s in StatefulSet %s successful"
+	MessageCleanupPodFinished = "cleanup Pod %s in StatefulSet %s completed successfully"
+	MessageCleanupPodDeleted  = "delete Cleanup Pod %s in StatefulSet %s successful"
+	MessagePVCDeleted         = "delete Claim %s in StatefulSet %s successful"
 
 	FinalizerName = "statefulsets.kubernetes.io/scaledown"
 )
@@ -51,8 +51,8 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		return nil
 	}
 
-	if sts.Annotations[AnnotationDrainerPodTemplate] == "" {
-		glog.Infof("Ignoring StatefulSet '%s' because it does not define a drain pod template.", sts.Name)
+	if sts.Annotations[AnnotationSclaedownPodTemplate] == "" {
+		glog.Infof("Ignoring StatefulSet '%s' because it does not define a scaledown pod template.", sts.Name)
 		return nil
 	}
 
@@ -94,23 +94,22 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 			return fmt.Errorf("Error getting Pod %s: %s", podName, err)
 		}
 
-		// TODO: scale down to zero? should what happens on such events be configurable? there may or may not be anywhere to drain to
 		if int32(ordinal) >= *sts.Spec.Replicas || statefulSetTerminating {
 			// PVC exists, but its ordinal is higher than the current last stateful pod's ordinal;
-			// this means the PVC is an orphan and should be drained & deleted
+			// this means the PVC is an orphan and should be cleaned up & deleted
 
 			// If the Pod doesn't exist, we'll create it
 			if pod == nil { // TODO: what if the PVC doesn't exist here (or what if it's deleted just after we create the pod)
-				glog.Infof("Found orphaned PVC(s) for ordinal '%d'. Creating drain pod '%s'.", ordinal, podName)
+				glog.Infof("Found orphaned PVC(s) for ordinal '%d'. Creating cleanup pod '%s'.", ordinal, podName)
 
-				err = c.createDrainPod(sts, ordinal)
+				err = c.createCleanupPod(sts, ordinal)
 				if err != nil {
 					return err
 				}
 
 				if sts.Spec.PodManagementPolicy == appsv1.OrderedReadyPodManagement {
-					// don't create additional drain pods; they will be created in one of the
-					// next invocations of this method, when the current drain pod finishes
+					// don't create additional cleanup pods; they will be created in one of the
+					// next invocations of this method, when the current cleanup pod finishes
 					break
 				}
 
@@ -118,9 +117,9 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 			}
 		}
 
-		if isDrainPod(pod) && pod.Status.Phase == corev1.PodSucceeded {
-			glog.Infof("Drain pod '%s' finished. Deleting it and its PVCs.", pod.Name)
-			err = c.deleteDrainPodAndClaims(sts, pod, ordinal)
+		if isCleanupPod(pod) && pod.Status.Phase == corev1.PodSucceeded {
+			glog.Infof("Cleanup pod '%s' finished. Deleting it and its PVCs.", pod.Name)
+			err = c.deleteCleanupPodAndClaims(sts, pod, ordinal)
 			if err != nil {
 				return err
 			}
@@ -150,10 +149,10 @@ func (c *Controller) getClaims(sts *appsv1.StatefulSet) (claimsGroupedByOrdinal 
 	return filterAndGroupClaimsByOrdinal(allClaims, sts), nil
 }
 
-func (c *Controller) createDrainPod(sts *appsv1.StatefulSet, ordinal int) error {
+func (c *Controller) createCleanupPod(sts *appsv1.StatefulSet, ordinal int) error {
 	pod, err := newPod(sts, ordinal)
 	if err != nil {
-		return fmt.Errorf("Can't create drain Pod object: %s", err)
+		return fmt.Errorf("Can't create cleanup Pod object: %s", err)
 	}
 	pod, err = c.kubeclient.CoreV1().Pods(sts.Namespace).Create(pod)
 
@@ -161,15 +160,15 @@ func (c *Controller) createDrainPod(sts *appsv1.StatefulSet, ordinal int) error 
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
-		return fmt.Errorf("Error creating drain Pod: %s", err)
+		return fmt.Errorf("Error creating cleanup Pod: %s", err)
 	}
 
-	c.recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageDrainPodCreated, pod.Name, sts.Name))
+	c.recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageCleanupPodCreated, pod.Name, sts.Name))
 	return nil
 }
 
-func (c *Controller) deleteDrainPodAndClaims(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
-	c.recorder.Event(sts, corev1.EventTypeNormal, DrainSuccess, fmt.Sprintf(MessageDrainPodFinished, pod.Name, sts.Name))
+func (c *Controller) deleteCleanupPodAndClaims(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
+	c.recorder.Event(sts, corev1.EventTypeNormal, CleanupSuccess, fmt.Sprintf(MessageCleanupPodFinished, pod.Name, sts.Name))
 
 	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
 		pvcName := getPVCName(sts, pvcTemplate.Name, ordinal)
@@ -184,12 +183,12 @@ func (c *Controller) deleteDrainPodAndClaims(sts *appsv1.StatefulSet, pod *corev
 	// TODO what if the user scales up the statefulset and the statefulset controller creates the new pod after we delete the pod but before we delete the PVC
 	// TODO what if we crash after we delete the PVC, but before we delete the pod?
 
-	glog.Infof("Deleting drain pod %s", pod.Name)
+	glog.Infof("Deleting cleanup pod %s", pod.Name)
 	err := c.kubeclient.CoreV1().Pods(sts.Namespace).Delete(pod.Name, nil)
 	if err != nil {
 		return err
 	}
-	c.recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessageDrainPodDeleted, pod.Name, sts.Name))
+	c.recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessageCleanupPodDeleted, pod.Name, sts.Name))
 	return nil
 }
 
@@ -205,7 +204,7 @@ func extractOrdinals(m map[int][]*corev1.PersistentVolumeClaim) []int {
 	return keys
 }
 
-// TODO: prevent sts controller from deleting pod-1 while pod-2 drain pod is running (using finalizers on pods?)
+// TODO: prevent sts controller from deleting pod-1 while pod-2 cleanup pod is running (using finalizers on pods?)
 
 func (c *Controller) removeFinalizer(sts *appsv1.StatefulSet) error {
 	glog.Infof("Removing finalizer from StatefulSet %s/%s", sts.Namespace, sts.Name)

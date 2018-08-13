@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-const annotation = "statefulsets.kubernetes.io/drainer-pod-template"
+const annotation = "statefulsets.kubernetes.io/scaledown-pod-template"
 
 var (
 	alwaysReady        = func() bool { return true }
@@ -270,7 +270,7 @@ func TestIgnoresStatefulSetsWithoutVolumeClaimTemplates(t *testing.T) {
 	f.run(sts)
 }
 
-func TestIgnoresStatefulSetsWithoutDrainPodTemplate(t *testing.T) {
+func TestIgnoresStatefulSetsWithoutCleanupPodTemplate(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
@@ -332,7 +332,7 @@ func TestCreatesPodOnScaleDown(t *testing.T) {
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
-	expectedPod := newDrainPod(1)
+	expectedPod := newCleanupPod(1)
 	f.expectCreatePodAction(expectedPod)
 
 	f.run(sts)
@@ -342,7 +342,7 @@ func TestDoesNotCreatePodOnScaleDownWhenPodAlreadyExists(t *testing.T) {
 	f := newFixture(t)
 	sts := newStatefulSet()
 	sts.Spec.Replicas = int32Ptr(1)
-	f.addPods(newDrainPod(1))
+	f.addPods(newCleanupPod(1))
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
@@ -356,7 +356,7 @@ func TestCreatesPodOnScaleDownToZero(t *testing.T) {
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(1)...)
 
-	expectedPod := newDrainPod(0)
+	expectedPod := newCleanupPod(0)
 	f.expectCreatePodAction(expectedPod)
 
 	f.run(sts)
@@ -369,7 +369,7 @@ func TestCreatesOnlyHighestOrdinalPodWhenPodManagementPolicyIsOrderedReady(t *te
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(3)...)
 
-	f.expectCreatePodAction(newDrainPod(2))
+	f.expectCreatePodAction(newCleanupPod(2))
 
 	f.run(sts)
 }
@@ -382,8 +382,8 @@ func TestCreatesMultiplePodsWhenPodManagementPolicyIsParallel(t *testing.T) {
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(3)...)
 
-	f.expectCreatePodAction(newDrainPod(2))
-	f.expectCreatePodAction(newDrainPod(1))
+	f.expectCreatePodAction(newCleanupPod(2))
+	f.expectCreatePodAction(newCleanupPod(1))
 
 	f.run(sts)
 }
@@ -395,7 +395,7 @@ func TestDeletesPodAndClaimOnSuccessfulCompletion(t *testing.T) {
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 
-	pod := newDrainPod(1)
+	pod := newCleanupPod(1)
 	pod.Status.Phase = corev1.PodSucceeded
 	f.addPods(pod)
 
@@ -414,7 +414,7 @@ func TestMultipleVolumeClaimTemplates(t *testing.T) {
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 	f.addPersistentVolumeClaims(newCustomPersistentVolumeClaims("other", "my-statefulset", 2)...)
 
-	expectedPod := newDrainPod(1)
+	expectedPod := newCleanupPod(1)
 	expectedPod.Spec.Volumes = append(expectedPod.Spec.Volumes, newVolume("other"))
 	f.expectCreatePodAction(expectedPod)
 
@@ -451,7 +451,7 @@ func TestMultipleVolumeClaimTemplatesWithOnePVCMissing(t *testing.T) {
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(2)...)
 	f.addPersistentVolumeClaims(newCustomPersistentVolumeClaims("other", "my-statefulset", 1)...) // note that PVC with ordinal 1 is missing
 
-	expectedPod := newDrainPod(1)
+	expectedPod := newCleanupPod(1)
 	expectedPod.Spec.Volumes = append(expectedPod.Spec.Volumes, newVolume("other"))
 	f.expectCreatePodAction(expectedPod)
 
@@ -466,7 +466,7 @@ func TestCreatesPodOnStatefulSetDelete(t *testing.T) {
 	f.addStatefulSets(sts)
 	f.addPersistentVolumeClaims(newPersistentVolumeClaims(3)...)
 
-	expectedPod := newDrainPod(2)
+	expectedPod := newCleanupPod(2)
 	f.expectCreatePodAction(expectedPod)
 
 	f.run(sts)
@@ -502,21 +502,21 @@ func TestRemovesFinalizerWhenFinished(t *testing.T) {
 }
 
 // TODO: check what happens on scaledown of -2 when pod with ordinal 2 completes (is pod1 created immediately?)
-// TODO: StatefulSet deleted while drain pod is running
-// TODO: drain pod has same labels as regular pods (check what happens; do we need to prevent that?)
-// TODO: scale down, wait for drain pod to run, scale back up and back down - will the sts controller delete the drain pod?
+// TODO: StatefulSet deleted while cleanup pod is running
+// TODO: cleanup pod has same labels as regular pods (check what happens; do we need to prevent that?)
+// TODO: scale down, wait for cleanup pod to run, scale back up and back down - will the sts controller delete the cleanup pod?
 
-func newDrainPod(ordinal int) *corev1.Pod {
-	podTemplate := newDrainPodTemplateSpec()
+func newCleanupPod(ordinal int) *corev1.Pod {
+	podTemplate := newCleanupPodTemplateSpec()
 	expectedPod := &corev1.Pod{
 		ObjectMeta: podTemplate.ObjectMeta,
 		Spec:       podTemplate.Spec,
 	}
 	expectedPod.ObjectMeta.Name = fmt.Sprintf("my-statefulset-%d", ordinal)
 	expectedPod.ObjectMeta.Namespace = metav1.NamespaceDefault
-	expectedPod.ObjectMeta.Labels["drain-pod"] = fmt.Sprintf("my-statefulset-%d", ordinal)
+	expectedPod.ObjectMeta.Labels["scaledown-pod"] = fmt.Sprintf("my-statefulset-%d", ordinal)
 	expectedPod.ObjectMeta.Annotations = map[string]string{
-		"statefulsets.kubernetes.io/drainer-pod-owner": "my-statefulset",
+		"statefulsets.kubernetes.io/scaledown-pod-owner": "my-statefulset",
 	}
 	expectedPod.Spec.Volumes = append(expectedPod.Spec.Volumes, corev1.Volume{
 		Name: "data",
@@ -561,7 +561,7 @@ func newStatefulSet() *appsv1.StatefulSet {
 			Name:      "my-statefulset",
 			Namespace: metav1.NamespaceDefault,
 			Annotations: map[string]string{
-				annotation: toJSON(newDrainPodTemplateSpec()),
+				annotation: toJSON(newCleanupPodTemplateSpec()),
 			},
 			Finalizers: []string{
 				FinalizerName,
@@ -608,11 +608,11 @@ func newStatefulSet() *appsv1.StatefulSet {
 	}
 }
 
-func newDrainPodTemplateSpec() *corev1.PodTemplateSpec {
+func newCleanupPodTemplateSpec() *corev1.PodTemplateSpec {
 	return &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"app": "my-drainer",
+				"app": "my-cleanup-pod",
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -660,10 +660,10 @@ func newVolumeMount(name, mountPath string) corev1.VolumeMount {
 
 func int32Ptr(i int32) *int32 { return &i }
 
-func toJSON(drainPodTemplateSpec interface{}) string {
-	drainPodTemplateJson, err := json.Marshal(drainPodTemplateSpec)
+func toJSON(obj interface{}) string {
+	json, err := json.Marshal(obj)
 	if err != nil {
 		panic(err)
 	}
-	return string(drainPodTemplateJson)
+	return string(json)
 }
