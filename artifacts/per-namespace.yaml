@@ -17,7 +17,7 @@ spec:
       serviceAccountName: statefulset-scaledown-controller
       containers:
       - name: main
-        image: docker.io/luksa/statefulset-scaledown-controller:0.5
+        image: docker.io/luksa/statefulset-scaledown-controller:0.6
         args:
         - --localOnly
 ---
