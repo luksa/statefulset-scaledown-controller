@@ -29,12 +29,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
+type ConfigOptions struct {
 	masterURL  string
 	kubeconfig string
 	namespace  string
 	localOnly  bool
-)
+}
+
+var config ConfigOptions
 
 func main() {
 	flag.Parse()
@@ -42,7 +44,7 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
+	cfg, err := clientcmd.BuildConfigFromFlags(config.masterURL, config.kubeconfig)
 	if err != nil {
 		glog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
@@ -53,17 +55,17 @@ func main() {
 	}
 
 	var kubeInformerFactory kubeinformers.SharedInformerFactory
-	if localOnly {
-		if namespace == "" {
+	if config.localOnly {
+		if config.namespace == "" {
 			bytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 			if err != nil {
 				glog.Fatalf("Using --localOnly without --namespace, but unable to determine namespace: %s", err.Error())
 			}
-			namespace = string(bytes)
+			config.namespace = string(bytes)
 		}
 
-		glog.Infof("Configured to only operate on StatefulSets in namespace %s", namespace)
-		kubeInformerFactory = kubeinformers.NewFilteredSharedInformerFactory(kubeClient, time.Second*30, namespace, nil)
+		glog.Infof("Configured to only operate on StatefulSets in namespace %s", config.namespace)
+		kubeInformerFactory = kubeinformers.NewFilteredSharedInformerFactory(kubeClient, time.Second*30, config.namespace, nil)
 	} else {
 		glog.Infof("Configured to operate on StatefulSets across all namespaces")
 		kubeInformerFactory = kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
@@ -79,8 +81,8 @@ func main() {
 }
 
 func init() {
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
-	flag.BoolVar(&localOnly, "localOnly", false, "If enabled, the controller only handles StatefulSets in a single namespace instead of across all namespaces.")
-	flag.StringVar(&namespace, "namespace", "", "Only used with --localOnly. When specified, the controller only handles StatefulSets in the specified namespace. If left empty, the controller defaults to the namespace it is running in (read from /var/run/secrets/kubernetes.io/serviceaccount/namespace).")
+	flag.StringVar(&config.kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&config.masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&config.localOnly, "localOnly", false, "If enabled, the controller only handles StatefulSets in a single namespace instead of across all namespaces.")
+	flag.StringVar(&config.namespace, "namespace", "", "Only used with --localOnly. When specified, the controller only handles StatefulSets in the specified namespace. If left empty, the controller defaults to the namespace it is running in (read from /var/run/secrets/kubernetes.io/serviceaccount/namespace).")
 }
