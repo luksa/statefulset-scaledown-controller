@@ -25,13 +25,13 @@ import (
 )
 
 const AnnotationStatefulSet = "statefulsets.kubernetes.io/scaledown-pod-owner" // TODO: can we replace this with an OwnerReference with the StatefulSet as the owner?
-const AnnotationSclaedownPodTemplate = "statefulsets.kubernetes.io/scaledown-pod-template"
+const AnnotationScaledownPodTemplate = "statefulsets.kubernetes.io/scaledown-pod-template"
 
 const LabelScaledownPod = "scaledown-pod"
 
 func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 
-	podTemplateJson := sts.Annotations[AnnotationSclaedownPodTemplate]
+	podTemplateJson := sts.Annotations[AnnotationScaledownPodTemplate]
 	if podTemplateJson == "" {
 		return nil, fmt.Errorf("No cleanup pod template configured for StatefulSet %s.", sts.Name)
 	}

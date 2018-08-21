@@ -51,7 +51,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		return nil
 	}
 
-	if sts.Annotations[AnnotationSclaedownPodTemplate] == "" {
+	if sts.Annotations[AnnotationScaledownPodTemplate] == "" {
 		glog.Infof("Ignoring StatefulSet '%s' because it does not define a scaledown pod template.", sts.Name)
 		return nil
 	}
