@@ -163,12 +163,12 @@ func (c *Controller) createCleanupPod(sts *appsv1.StatefulSet, ordinal int) erro
 		return fmt.Errorf("Error creating cleanup Pod: %s", err)
 	}
 
-	c.recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageCleanupPodCreated, pod.Name, sts.Name))
+	c.Recorder.Event(sts, corev1.EventTypeNormal, SuccessCreate, fmt.Sprintf(MessageCleanupPodCreated, pod.Name, sts.Name))
 	return nil
 }
 
 func (c *Controller) deleteCleanupPodAndClaims(sts *appsv1.StatefulSet, pod *corev1.Pod, ordinal int) error {
-	c.recorder.Event(sts, corev1.EventTypeNormal, CleanupSuccess, fmt.Sprintf(MessageCleanupPodFinished, pod.Name, sts.Name))
+	c.Recorder.Event(sts, corev1.EventTypeNormal, CleanupSuccess, fmt.Sprintf(MessageCleanupPodFinished, pod.Name, sts.Name))
 
 	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
 		pvcName := getPVCName(sts, pvcTemplate.Name, ordinal)
@@ -177,7 +177,7 @@ func (c *Controller) deleteCleanupPodAndClaims(sts *appsv1.StatefulSet, pod *cor
 		if err != nil {
 			return err
 		}
-		c.recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessagePVCDeleted, pvcName, sts.Name))
+		c.Recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessagePVCDeleted, pvcName, sts.Name))
 	}
 
 	// TODO what if the user scales up the statefulset and the statefulset controller creates the new pod after we delete the pod but before we delete the PVC
@@ -188,7 +188,7 @@ func (c *Controller) deleteCleanupPodAndClaims(sts *appsv1.StatefulSet, pod *cor
 	if err != nil {
 		return err
 	}
-	c.recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessageCleanupPodDeleted, pod.Name, sts.Name))
+	c.Recorder.Event(sts, corev1.EventTypeNormal, DeleteSuccess, fmt.Sprintf(MessageCleanupPodDeleted, pod.Name, sts.Name))
 	return nil
 }
 

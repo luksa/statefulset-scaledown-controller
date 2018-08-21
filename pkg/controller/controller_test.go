@@ -95,7 +95,7 @@ func (f *fixture) newController() (*Controller, kubeinformers.SharedInformerFact
 
 	c := NewController(f.kubeclient, informerFactory)
 
-	c.recorder = &record.FakeRecorder{}
+	c.Recorder = &record.FakeRecorder{}
 
 	for _, pod := range f.pods {
 		informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(pod)
