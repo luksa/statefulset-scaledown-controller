@@ -66,15 +66,10 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	kubeInformerFactory kubeinformers.SharedInformerFactory) *Controller {
 
-	// obtain references to shared index informers for the Deployment and Foo
-	// types.
 	statefulSetInformer := kubeInformerFactory.Apps().V1().StatefulSets()
 	pvcInformer := kubeInformerFactory.Core().V1().PersistentVolumeClaims()
 	podInformer := kubeInformerFactory.Core().V1().Pods()
 
-	// Create event broadcaster
-	// Add statefulset-scaledown-controller types to the default Kubernetes Scheme so Events can be
-	// logged for statefulset-scaledown-controller types.
 	glog.V(4).Info("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -93,14 +88,14 @@ func NewController(
 		Recorder:           recorder,
 	}
 
-	glog.Info("Setting up event handlers")
-	// Set up an event handler for when StatefulSet resources change
+	glog.Info("Setting up event handlers for StatefulSet resources")
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueStatefulSet,
 		UpdateFunc: func(old, new interface{}) {
 			controller.enqueueStatefulSet(new)
 		},
 	})
+
 	// Set up an event handler for when Pod resources change. This
 	// handler will lookup the owner of the given Pod, and if it is
 	// owned by a StatefulSet resource will enqueue that StatefulSet
@@ -196,7 +191,7 @@ func (c *Controller) processNextWorkItem() bool {
 			return nil
 		}
 		// Run the syncHandler, passing it the namespace/name string of the
-		// Foo resource to be synced.
+		// resource to be synced.
 		if err := c.syncHandler(key); err != nil {
 			return fmt.Errorf("error syncing '%s': %s", key, err.Error())
 		}
