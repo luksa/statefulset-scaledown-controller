@@ -129,11 +129,17 @@ data-datastore-0   Bound     pvc-57224b8f-...   1Mi        ...
 data-datastore-1   Bound     pvc-5acaf078-...   1Mi        ...
 ```
 
+## Running in H/A mode
+
+Multiple instances of the controller can be run in parallel to achieve high availability. 
+By running the controller with the `--leader-elect` option, the controller only runs its control loop when it is the elected leader. 
+
+The controller uses the standard Kubernetes mechanism for leader election and needs RBAC permissions to create, modify and retrieve a ConfigMap resource with the name `statefulset-scaledown-controller` in the namespace specified with `--leader-election-namespace`.
+
 
 ## Known issues / deficiencies
 
 Please be aware of the following issues:
 - If the StatefulSet is deleted, the controller currently does not create any cleanup pods. Please scale down the StatefulSet to zero, wait for all the cleanup pods to finish, and only then delete the StatefulSet.  
 - If the StatefulSet is deleted while a cleanup pod is running, the pod is never deleted by the controller. Please delete the pod manually or scale downthe StatefulSet to zero before deleting it, as described above.
-- Only one instance of the controller can run in the cluster/namespace (no HA support yet)
 - Controller does not expose any metrics
