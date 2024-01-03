@@ -32,8 +32,8 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
-	"sts-scaledown-controller/pkg/controller"
-	"sts-scaledown-controller/pkg/signals"
+	"statefulset-scaledown-controller/pkg/controller"
+	"statefulset-scaledown-controller/pkg/signals"
 )
 
 type ConfigOptions struct {

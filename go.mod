@@ -1,4 +1,4 @@
-module sts-scaledown-controller
+module statefulset-scaledown-controller
 
 go 1.21
 
