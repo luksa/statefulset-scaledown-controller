@@ -17,13 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/jboss-openshift/statefulset-scaledown-controller/pkg/controller"
-	"github.com/jboss-openshift/statefulset-scaledown-controller/pkg/signals"
-	"io/ioutil"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -31,7 +31,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"os"
+
+	"statefulset-scaledown-controller/pkg/controller"
+	"statefulset-scaledown-controller/pkg/signals"
 )
 
 type ConfigOptions struct {
@@ -99,7 +101,7 @@ func main() {
 	var kubeInformerFactory kubeinformers.SharedInformerFactory
 	if config.localOnly {
 		if config.namespace == "" {
-			bytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+			bytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 			if err != nil {
 				glog.Fatalf("Using --localOnly without --namespace, but unable to determine namespace: %s", err.Error())
 			}
@@ -146,6 +148,7 @@ func main() {
 		config.LeaderElectionNamespace,
 		"statefulset-scaledown-controller",
 		leaderElectionClient.CoreV1(),
+		leaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id + "-external-statefulset-scaledown-controller",
 			EventRecorder: c.Recorder,
@@ -155,13 +158,17 @@ func main() {
 	}
 
 	// Try and become the leader and start controller loop
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          lock,
 		LeaseDuration: config.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: config.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   config.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: runController,
+			OnStartedLeading: func(ctx context.Context) {
+				glog.Infof("Running with leader election (HA mode)")
+				runController(stopCh)
+				panic("unreachable")
+			},
 			OnStoppedLeading: func() {
 				glog.Fatalf("Stopped being the leader. Exiting!")
 			},
@@ -194,9 +201,9 @@ func init() {
 	flag.DurationVar(&config.LeaderElection.RetryPeriod.Duration, "leader-elect-retry-period", DefaultRetryPeriod, ""+
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled.")
-	flag.StringVar(&config.LeaderElection.ResourceLock, "leader-elect-resource-lock", resourcelock.ConfigMapsResourceLock, ""+
+	flag.StringVar(&config.LeaderElection.ResourceLock, "leader-elect-resource-lock", resourcelock.LeasesResourceLock, ""+
 		"The type of resource object that is used for locking during "+
-		"leader election. Supported options are `configmaps` (default) and `endpoints`.")
+		"leader election. Supported option is `leases`.")
 
 	flag.StringVar(&config.LeaderElectionNamespace, "leader-election-namespace", "", "Namespace to use for leader election lock (defaults to the controller's namespace)")
 }

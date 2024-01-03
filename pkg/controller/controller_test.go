@@ -434,12 +434,13 @@ func TestMultipleVolumeClaimTemplates(t *testing.T) {
 // Imagine having a StatefulSet with two volumeClaimTemplates. If a scale-down occurs
 // and for some reason one of those PVCs is deleted by someone, should the controller
 // create the cleanup pod or not?
-// - If it creates it, the pod won't be scheduled because of the missing PVC. If the
-//   StatefulSet is then scaled up, the StatefulSet controller will first create the
-//   PVC, allowing the cleanup controller to finally run. Once it finishes, the
-//   StatefulSet controller will create the regular pod again.
-// - If it doesn't create the cleanup pod and then the StatefulSet controller is
-//   scaled up, the regular pod will be created instead of the cleanup pod.
+//   - If it creates it, the pod won't be scheduled because of the missing PVC. If the
+//     StatefulSet is then scaled up, the StatefulSet controller will first create the
+//     PVC, allowing the cleanup controller to finally run. Once it finishes, the
+//     StatefulSet controller will create the regular pod again.
+//   - If it doesn't create the cleanup pod and then the StatefulSet controller is
+//     scaled up, the regular pod will be created instead of the cleanup pod.
+//
 // Currently, the controller works as described in the first bullet.
 func TestMultipleVolumeClaimTemplatesWithOnePVCMissing(t *testing.T) {
 	f := newFixture(t)

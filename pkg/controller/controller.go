@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/golang/glog"
@@ -72,7 +73,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 		glog.Infof("Adding finalizer to StatefulSet %s/%s", sts.Namespace, sts.Name)
 
 		sts.ObjectMeta.Finalizers = append(sts.ObjectMeta.Finalizers, FinalizerName)
-		_, err := c.kubeclient.AppsV1().StatefulSets(sts.Namespace).Update(sts)
+		_, err := c.kubeclient.AppsV1().StatefulSets(sts.Namespace).Update(context.TODO(), sts, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("Error adding finalizer to StatefulSet %s/%s: %s", sts.Namespace, sts.Name, err)
 		}
@@ -154,7 +155,7 @@ func (c *Controller) createCleanupPod(sts *appsv1.StatefulSet, ordinal int) erro
 	if err != nil {
 		return fmt.Errorf("Can't create cleanup Pod object: %s", err)
 	}
-	pod, err = c.kubeclient.CoreV1().Pods(sts.Namespace).Create(pod)
+	pod, err = c.kubeclient.CoreV1().Pods(sts.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 
 	// If an error occurs during Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
@@ -173,7 +174,7 @@ func (c *Controller) deleteCleanupPodAndClaims(sts *appsv1.StatefulSet, pod *cor
 	for _, pvcTemplate := range sts.Spec.VolumeClaimTemplates {
 		pvcName := getPVCName(sts, pvcTemplate.Name, ordinal)
 		glog.Infof("Deleting PVC %s", pvcName)
-		err := c.kubeclient.CoreV1().PersistentVolumeClaims(sts.Namespace).Delete(pvcName, nil)
+		err := c.kubeclient.CoreV1().PersistentVolumeClaims(sts.Namespace).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -184,7 +185,7 @@ func (c *Controller) deleteCleanupPodAndClaims(sts *appsv1.StatefulSet, pod *cor
 	// TODO what if we crash after we delete the PVC, but before we delete the pod?
 
 	glog.Infof("Deleting cleanup pod %s", pod.Name)
-	err := c.kubeclient.CoreV1().Pods(sts.Namespace).Delete(pod.Name, nil)
+	err := c.kubeclient.CoreV1().Pods(sts.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
@@ -213,6 +214,6 @@ func (c *Controller) removeFinalizer(sts *appsv1.StatefulSet) error {
 	}
 
 	sts.ObjectMeta.Finalizers = sts.ObjectMeta.Finalizers[1:]
-	_, err := c.kubeclient.AppsV1().StatefulSets(sts.Namespace).Update(sts)
+	_, err := c.kubeclient.AppsV1().StatefulSets(sts.Namespace).Update(context.TODO(), sts, metav1.UpdateOptions{})
 	return err
 }
